@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/0. Root/">
+    <File Path="../../README.md" />
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+  </Folder>
+  <Folder Name="/1. Foundation/">
+    <Project Path="foundation/AspNetCore/AspNetCore.csproj" Id="f8ad72b6-eb37-4542-9193-8a522d5af87a" />
+    <Project Path="foundation/Core/Core.csproj" Id="a31f60cf-3b37-48d0-b116-e655bd072da2" />
+    <Project Path="foundation/EntityFrameworkCore/EntityFrameworkCore.csproj" Id="29377d5f-5738-4daa-b292-1bbcd2d860c8" />
+    <Project Path="foundation/Observability/Observability.csproj" Id="6fe09302-a004-409b-80b8-1f39971fd85e" />
+  </Folder>
+  <Project Path="src/App.Api/App.Api.csproj" Id="a7b5cad0-01ec-4a23-b1a4-84c7e0bcc8c6" />
+  <Project Path="src/Core/Core.csproj" Id="f3786771-ea0e-4efa-85ca-ddfe0dfa244e" />
+  <Project Path="src/Features/Features.csproj" Id="3e7c308f-43d2-407a-85f9-6d901defe247" />
+  <Project Path="src/Infra/Infra.csproj" Id="4ac5f27d-70d5-49bf-bf7a-a51a631750c2" />
+</Solution>

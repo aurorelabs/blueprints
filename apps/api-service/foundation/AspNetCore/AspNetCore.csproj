@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!--<Version>$(AspNetCoreVersion)</Version>-->
+		<AssemblyName>Aurore.Foundation.AspNetCore</AssemblyName>
+		<RootNamespace>Aurore.Foundation.AspNetCore</RootNamespace>
+		<Product>Aurore Foundation @ AspNetCore</Product>
+		<Description>ASP.NET Core extensions and utilities for aurore projects.</Description>
+		<PackageTags>aurore aspnetcore extensions utilities helpers</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+</Project>

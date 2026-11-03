@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!--<Version>$(EntityFrameworkCoreVersion)</Version>-->
+		<AssemblyName>Aurore.Foundation.EntityFrameworkCore</AssemblyName>
+		<RootNamespace>Aurore.Foundation.EntityFrameworkCore</RootNamespace>
+		<Product>Aurore Foundation @ EntityFrameworkCore</Product>
+		<Description>Entity Framework Core extensions and utilities for aurore projects.</Description>
+		<PackageTags>aurore entityframeworkcore extensions utilities helpers</PackageTags>
+	</PropertyGroup>
+
+</Project>

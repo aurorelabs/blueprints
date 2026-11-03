@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!--<Version>$(ObservabilityVersion)</Version>-->
+		<AssemblyName>Aurore.Foundation.Observability</AssemblyName>
+		<RootNamespace>Aurore.Foundation.Observability</RootNamespace>
+		<Product>Aurore Foundation @ Observability</Product>
+		<Description>Observability extensions and utilities for aurore projects.</Description>
+		<PackageTags>aurore observability extensions utilities helpers</PackageTags>
+
+		<!-- Required for Observability packages that are on beta -->
+		<WarningsNotAsErrors>$(WarningsNotAsErrors);NU5104</WarningsNotAsErrors>
+	</PropertyGroup>
+
+</Project>

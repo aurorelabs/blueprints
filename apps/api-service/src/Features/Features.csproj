@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<AssemblyName>Aurore.Blueprints.ApiService.Features</AssemblyName>
+		<RootNamespace>Aurore.Blueprints.ApiService.Features</RootNamespace>
+	</PropertyGroup>
+
+</Project>
