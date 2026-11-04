@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<!--<Version>$(CoreVersion)</Version>-->
-		<AssemblyName>Aurore.Foundation.Core</AssemblyName>
-		<RootNamespace>Aurore.Foundation.Core</RootNamespace>
-		<Product>Aurore Foundation @ Core</Product>
-		<Description>Dependency-light core and common utilities for aurore projects.</Description>
-		<PackageTags>aurore core abstractions utilities helpers</PackageTags>
-	</PropertyGroup>
+  <PropertyGroup>
+    <!--<Version>$(CoreVersion)</Version>-->
+    <AssemblyName>Aurore.Foundation.Core</AssemblyName>
+    <RootNamespace>Aurore.Foundation.Core</RootNamespace>
+    <Product>Aurore Foundation @ Core</Product>
+    <Description>Dependency-light core and common utilities for aurore projects.</Description>
+    <PackageTags>aurore core abstractions utilities helpers</PackageTags>
+  </PropertyGroup>
 
 </Project>

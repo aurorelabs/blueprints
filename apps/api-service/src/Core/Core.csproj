@@ -1,8 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<AssemblyName>Aurore.Blueprints.ApiService.Core</AssemblyName>
-		<RootNamespace>Aurore.Blueprints.ApiService.Core</RootNamespace>
-	</PropertyGroup>
+  <PropertyGroup>
+    <AssemblyName>Aurore.Blueprints.ApiService.Core</AssemblyName>
+    <RootNamespace>Aurore.Blueprints.ApiService.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\foundation\Core\Core.csproj" />
+    <ProjectReference Include="..\..\foundation\Telemetry\Telemetry.csproj" />
+  </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<AssemblyName>Aurore.Blueprints.ApiService.Infra</AssemblyName>
-		<RootNamespace>Aurore.Blueprints.ApiService.Infra</RootNamespace>
-	</PropertyGroup>
+  <PropertyGroup>
+    <AssemblyName>Aurore.Blueprints.ApiService.Infra</AssemblyName>
+    <RootNamespace>Aurore.Blueprints.ApiService.Infra</RootNamespace>
+  </PropertyGroup>
 
 </Project>
