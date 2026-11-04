@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\foundation\Core\Core.csproj" />
     <ProjectReference Include="..\..\foundation\Telemetry\Telemetry.csproj" />
   </ItemGroup>

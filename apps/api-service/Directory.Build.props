@@ -13,7 +13,7 @@
         <Copyright>AuroreLabs</Copyright>
 
         <!-- Code Style Enforcement -->
-        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 

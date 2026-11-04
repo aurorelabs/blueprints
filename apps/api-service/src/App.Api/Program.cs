@@ -1,8 +1,14 @@
 using System;
-using Aurore.Blueprints.ApiService.App.Api.Files;
-using Aurore.Foundation.AspNetCore;
-using Aurore.Foundation.Core;
-using Aurore.Foundation.Telemetry;
+using Aurore.Blueprints.ApiService.App.Api.Configuration;
+using Aurore.Blueprints.ApiService.Features.Configuration;
+using Aurore.Blueprints.ApiService.Infra.Configuration;
+using Aurore.Foundation.AspNetCore.Authentication.Configuration;
+using Aurore.Foundation.AspNetCore.Configuration;
+using Aurore.Foundation.AspNetCore.HealthChecks.Configuration;
+using Aurore.Foundation.AspNetCore.RequestPipeline.Configuration;
+using Aurore.Foundation.Core.Application;
+using Aurore.Foundation.Core.Application.Constants;
+using Aurore.Foundation.Telemetry.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,63 +22,62 @@ try
         .ConfigureAuroreSerializers()
         .AddAppSettings(out var appSettings)
         .AddAuroreTelemetry(appSettings.AppInformation, appSettings.Telemetry)
-        .AddScalar(appSettings)
-        .AddAuroreCorsPolicies(appSettings.CorsPolicies)
-        ;
+        .AddAppScalar(appSettings)
+        .AddAuroreCorsPolicies(appSettings.CorsPolicies);
 
     AppDiagnostics.Initialize(appSettings.AppInformation.ActivitySource);
 
+    var pipeline = appSettings.RequestPipeline;
+
     builder.Services
-        .AddMemoryCache()
-        .AddHttpClient()
-        .AddHttpContextAccessor()
-        .AddRequestContext()
+        .ConfigureAuroreKestrelLimits(pipeline.KestrelLimits)
+        .ConfigureAuroreForwardedHeaders(pipeline.ForwardedHeaders)
+        .AddAuroreRequestContext()
         .AddAuroreApiVersioning()
-        .AddAuroreResponseCompression()
-        .AddAuroreAuthentication(appSettings.IdentityProvider)
-        .AddAuroreAuthorization()
+        .AddAuroreResponseCompression(pipeline.ResponseCompression)
+        .AddAuroreAuthentication(appSettings.IdentityProvider, appSettings.ApiKeys)
+        .AddAuthorization()
         .AddAuroreHealthChecks(appSettings.AppInformation, appSettings.HealthChecks, appSettings.Dependencies)
-        // app validators
-        // feature deps
-        // infra deps
-        // request pipeline
-        // maintenance mode
-        // error handler
-        ;
+        .AddAuroreRequestTimeouts(pipeline.Timeouts)
+        .AddAuroreRateLimiting(pipeline.RateLimiting)
+        .AddAuroreIdempotency(pipeline.Idempotency)
+        .AddAuroreExceptionHandler()
+        .AddAppValidators(appSettings)
+        .AddAppFeatures(appSettings)
+        .AddAppInfra(appSettings);
 
     var app = builder.Build();
 
-    app.UseScalar(appSettings);
+    app.UseAppScalar(appSettings);
 
     app
         .UseForwardedHeaders()
-        // unexpected error
-        // security headers
-        .UseRequestContext()
-        // request enricher
-        // maintenance mode
-        // request timeouts (UseRequestTimeouts requires AddRequestTimeouts; add both together)
-        // body size limit
+        .UseExceptionHandler()
+        .UseAuroreSecurityHeaders(pipeline.SecurityHeaders)
+        .UseAuroreRequestContext()
         .UseHttpsRedirection()
+        .UseAuroreResponseCompression(pipeline.ResponseCompression)
         .UseCors()
+        .UseAuroreMaintenanceMode(appSettings.MaintenanceMode)
         .UseAuthentication()
         .UseAuthorization()
-        .UseResponseCompression()
-        // endpoint logging
-        // rate limiter (UseRateLimiter requires AddRateLimiter; add both when the app needs rate limiting)
+        .UseRateLimiter()
+        .UseRequestTimeouts()
         .UseOutputCache();
 
     app.MapAuroreHealthChecks(appSettings.AppInformation);
+
+    app.MapAppResources();
 
     app.Logger.LogInformation("Application is starting up...");
 
     app.Run();
 
-    return 0;
+    return ExitCodes.Success;
 }
 catch (Exception ex) when (ex is not HostAbortedException)
 {
     Console.Error.WriteLine($"Application failed with message: {ex}");
 
-    return ApplicationErrors.ConfigurationError;
+    return ExitCodes.ConfigurationError;
 }

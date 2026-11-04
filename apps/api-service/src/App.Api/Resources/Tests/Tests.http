@@ -1,0 +1,58 @@
+# Manual checks for the platform wiring. Run the app with the Development profile.
+@baseUrl = https://localhost:5001
+
+### Health: live -> 200 with name and version
+GET {{baseUrl}}/health/live
+
+### Health: ready -> 200, status only (no dependency names)
+GET {{baseUrl}}/health/ready
+
+### Health: status without a token -> 401
+GET {{baseUrl}}/health/status
+
+### Correlation: the response echoes this id
+GET {{baseUrl}}/v1/tests/correlation
+Correlation-Id: my-test-correlation-id
+
+### Correlation: invalid id (space and "!") -> a new one is generated
+GET {{baseUrl}}/v1/tests/correlation
+Correlation-Id: not valid!
+
+### Typed client (IGitHubClient on the GitHub dependency): 200 with the user, 404 for an unknown one
+GET {{baseUrl}}/v1/tests/github/octocat
+
+### Named client from IHttpClientFactory (RandomUser): forwards Correlation-Id
+GET {{baseUrl}}/v1/tests/random-user
+Correlation-Id: forwarded-to-random-user
+
+### Rate limiting: send 4 times within 10 seconds; the 4th returns 429 with Retry-After
+GET {{baseUrl}}/v1/tests/rate-limited
+
+### Timeout: 1 second -> 200
+GET {{baseUrl}}/v1/tests/timeout/1
+
+### Timeout: 5 seconds -> 504 after ~2 seconds (not enforced while debugging)
+GET {{baseUrl}}/v1/tests/timeout/5
+
+### Idempotency: send twice -> same id both times
+POST {{baseUrl}}/v1/tests/idempotent
+Idempotency-Key: test-key-1
+
+### Idempotency: different key -> different id
+POST {{baseUrl}}/v1/tests/idempotent
+Idempotency-Key: test-key-2
+
+### Errors: 500 ProblemDetails, no stack trace in the body
+GET {{baseUrl}}/v1/tests/error
+
+### Authorization: 401 without a token
+GET {{baseUrl}}/v1/tests/authorized
+
+### CORS preflight from the development origin -> 204 with Access-Control-* headers
+OPTIONS {{baseUrl}}/v1/tests/correlation
+Origin: http://localhost:4200
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: authorization,correlation-id
+
+### Security headers: check X-Content-Type-Options, X-Frame-Options and Referrer-Policy on the response
+GET {{baseUrl}}/health/live
