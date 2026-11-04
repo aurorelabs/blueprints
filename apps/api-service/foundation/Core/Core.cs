@@ -105,9 +105,9 @@ public static class StringExtensions
         return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    public static bool IsEqualTo([NotNullWhen(false)] this string value, string target)
+    public static bool IsEqualTo(this string? value, string? target)
     {
-        return string.Equals(value, target, StringComparison.InvariantCultureIgnoreCase);
+        return string.Equals(value, target, StringComparison.OrdinalIgnoreCase);
     }
 
     public static string[] SplitWords(this string? value)
@@ -376,7 +376,11 @@ public sealed record CorsPolicyOptions
     public string[] AllowedMethods { get; init; } = [];
     public string[] AllowedOrigins { get; init; } = [];
     public string[] ExposedHeaders { get; init; } = [];
+
+    // Only needed when the browser must send cookies (cookie-based auth). Bearer tokens in the
+    // Authorization header do not require it. Cannot be combined with a wildcard ('*') origin.
     public bool AllowCredentials { get; init; }
+
     public int PreflightMaxAgeSeconds { get; init; }
 }
 
@@ -385,7 +389,6 @@ public static class HealthCheckProperties
     public static class Headers
     {
         public const string Client = "AL-HealthCheck-Client";
-        public const string AuthorizationKey = "AL-HealthCheck-Authorization-Key";
     }
 
     public static class Endpoints
@@ -397,9 +400,9 @@ public static class HealthCheckProperties
 
     public static class Configuration
     {
-        public const int TimeoutInSeconds = 10;
+        public const int DefaultTimeoutSeconds = 5;
+        public const int DefaultCacheSeconds = 5;
         public const string OutputCacheKey = "health-checks-cache";
-        public const string RateLimitingKey = "health-checks-rate-limiting-checks";
     }
 
     public static class Tags
@@ -413,32 +416,26 @@ public static class HealthCheckProperties
     }
 }
 
-public record HealthCheckConfigurationOptions
+public sealed record HealthChecksOptions
 {
-    public string Token { get; set; } = string.Empty; // AI: Not sure about this thing, easier to limit endpoints with cors, no? or other way, I don't know. Seems weird. Maybe use headers instead? Look for something in the header? I don't know
-    public int RateLimitPermitCount { get; init; } = 5;
-    public int RateLimitWindowSeconds { get; init; } = 10;
-    public int ReadinessCacheSeconds { get; init; } = 5;
+    // How long readiness/status responses are cached, so frequent probes don't hammer dependencies.
+    public int CacheSeconds { get; init; } = HealthCheckProperties.Configuration.DefaultCacheSeconds;
 }
 
-public sealed record HealthCheckEndpointOptions
-{
-    public required string ServiceName { get; init; }
-    public required string Version { get; init; }
-    public required string Token { get; init; }
-}
-
-public sealed record HttpServiceDependencyOptions
+public sealed record HttpDependencyOptions
 {
     public required string BaseUrl { get; init; }
     public Dictionary<string, object> RequestHeaders { get; init; } = [];
-    public HttpServiceHealthCheckOptions? HealthCheck { get; init; }
+    public HttpDependencyHealthCheckOptions? HealthCheck { get; init; }
 }
 
-public sealed record HttpServiceHealthCheckOptions
+public sealed record HttpDependencyHealthCheckOptions
 {
-    public string? ReadinessEndpoint { get; init; }
-    public int TimeoutSeconds { get; init; }
+    public string ReadinessEndpoint { get; init; } = HealthCheckProperties.Endpoints.Readiness;
+    public int TimeoutSeconds { get; init; } = HealthCheckProperties.Configuration.DefaultTimeoutSeconds;
+
+    // Critical dependencies make this service Unhealthy (503) when they fail; non-critical ones only Degraded (200).
     public bool IsCritical { get; init; }
+
     public List<string> Tags { get; init; } = [];
 }

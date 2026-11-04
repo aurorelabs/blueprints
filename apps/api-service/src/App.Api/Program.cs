@@ -31,10 +31,8 @@ try
         .AddAuroreResponseCompression()
         .AddAuroreAuthentication(appSettings.IdentityProvider)
         .AddAuroreAuthorization()
-        .AddHealthChecks(appSettings)
-        // health check policies
+        .AddAuroreHealthChecks(appSettings.AppInformation, appSettings.HealthChecks, appSettings.Dependencies)
         // app validators
-        // health checks
         // feature deps
         // infra deps
         // request pipeline
@@ -53,7 +51,7 @@ try
         .UseRequestContext()
         // request enricher
         // maintenance mode
-        .UseRequestTimeouts()
+        // request timeouts (UseRequestTimeouts requires AddRequestTimeouts; add both together)
         // body size limit
         .UseHttpsRedirection()
         .UseCors()
@@ -61,10 +59,10 @@ try
         .UseAuthorization()
         .UseResponseCompression()
         // endpoint logging
-        .UseRateLimiter()
+        // rate limiter (UseRateLimiter requires AddRateLimiter; add both when the app needs rate limiting)
         .UseOutputCache();
 
-    app.MapHealthCheckEndpoints(appSettings.GetHealthCheckEndpointOptions());
+    app.MapAuroreHealthChecks(appSettings.AppInformation);
 
     app.Logger.LogInformation("Application is starting up...");
 

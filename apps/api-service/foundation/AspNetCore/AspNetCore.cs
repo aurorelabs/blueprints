@@ -6,8 +6,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Mime;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Threading;
-using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Asp.Versioning;
 using Aurore.Foundation.Core;
@@ -19,12 +19,12 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.OpenApi;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
@@ -355,6 +355,24 @@ public static class CorsConfiguration
 {
     private const string DefaultPolicyName = "default";
 
+    // Always allowed on every configured policy; configuration can add more headers but not remove these.
+    private static readonly string[] _defaultAllowedHeaders =
+    [
+        HeaderNames.Authorization,
+        HeaderNames.ContentType,
+        ApplicationHeaders.CorrelationId,
+        ApplicationHeaders.IdempotencyKey,
+        ApplicationHeaders.TraceParent,
+        HeaderNames.TraceState,
+    ];
+
+    // Response headers the browser lets front-end code read; configuration can add more.
+    private static readonly string[] _defaultExposedHeaders =
+    [
+        ApplicationHeaders.CorrelationId,
+        ApplicationHeaders.TraceParent,
+    ];
+
     public static IServiceCollection AddAllowAllCorsPolicy(this IServiceCollection services)
     {
         return services
@@ -362,7 +380,8 @@ public static class CorsConfiguration
                 .AddDefaultPolicy(builder => builder
                     .AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowAnyOrigin()));
+                    .AllowAnyOrigin()
+                    .WithExposedHeaders(_defaultExposedHeaders)));
     }
 
     public static IHostApplicationBuilder AddAuroreCorsPolicies(this IHostApplicationBuilder builder, IReadOnlyDictionary<string, CorsPolicyOptions> policies)
@@ -415,257 +434,245 @@ public static class CorsConfiguration
 
             if (invalidOrigin is not null)
                 throw new InvalidOperationException($"CORS policy '{name}' has an invalid origin '{invalidOrigin}'. Origins must be scheme + host (+ port) with no path or trailing slash, e.g. 'https://app.example.com'.");
+
+            // appsettings.json holds development values; a local origin in production means the
+            // production configuration (appsettings.Production.json or environment variables) is missing.
+            var localOrigin = isProduction ? policy.AllowedOrigins.FirstOrDefault(IsLocalOrigin) : null;
+
+            if (localOrigin is not null)
+                throw new InvalidOperationException($"CORS policy '{name}' allows the local origin '{localOrigin}' in production. Configure the production origins in appsettings.Production.json or environment variables.");
         }
+    }
+
+    private static bool IsLocalOrigin(string origin)
+    {
+        return Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            && (uri.IsLoopback || uri.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase));
     }
 
     private static Action<CorsPolicyBuilder> BuildPolicy(CorsPolicyOptions policy)
     {
+        var allowedHeaders = MergeHeaders(_defaultAllowedHeaders, policy.AllowedHeaders);
+        var exposedHeaders = MergeHeaders(_defaultExposedHeaders, policy.ExposedHeaders);
+
+        // "OPTIONS" does not need to be in AllowedMethods: a preflight is validated against the method in its
+        // Access-Control-Request-Method header (the actual request's method), never against OPTIONS itself.
+        // If preflights fail, first check that UseCors() runs before UseAuthentication()/UseAuthorization();
+        // if the problem persists, add "OPTIONS" back to AllowedMethods.
         return cors =>
         {
             cors
                 .WithOrigins(policy.AllowedOrigins)
                 .WithMethods(policy.AllowedMethods)
-                .WithHeaders(policy.AllowedHeaders)
-                .WithExposedHeaders(policy.ExposedHeaders)
+                .WithHeaders(allowedHeaders)
+                .WithExposedHeaders(exposedHeaders)
                 .SetPreflightMaxAge(TimeSpan.FromSeconds(policy.PreflightMaxAgeSeconds));
 
             if (policy.AllowCredentials)
                 cors.AllowCredentials();
         };
     }
+
+    private static string[] MergeHeaders(string[] defaults, string[] configured)
+    {
+        return [.. defaults.Concat(configured).Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
 }
-
-
 
 public static class HealthCheckConfiguration
 {
-    private static readonly Dictionary<HealthStatus, int> _resultStatusCodes = new()
+    public static IServiceCollection AddAuroreHealthChecks(
+        this IServiceCollection services,
+        AppInformationOptions appInfo,
+        HealthChecksOptions options,
+        IReadOnlyDictionary<string, HttpDependencyOptions> dependencies)
     {
-        [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status200OK,
-        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
-    };
+        // Always registered, so the endpoints work even when there are no dependencies to check.
+        var healthChecks = services.AddHealthChecks();
 
-    public static IServiceCollection AddHealthCheckRateLimiter(this IServiceCollection services, int permitLimit, int limitSeconds)
-    {
-        return services
-            .AddRateLimiter(o =>
-            {
-                o.OnRejected = async (context, cancellationToken) =>
-                {
-                    context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                    await context.HttpContext.Response.WriteAsJsonAsync(new { Message = "AI: FIX THIS MESSAGE" }, cancellationToken);
-                };
-
-                o.AddFixedWindowLimiter(HealthCheckProperties.Configuration.RateLimitingKey, limiter =>
-                {
-                    limiter.PermitLimit = permitLimit;
-                    limiter.Window = TimeSpan.FromSeconds(limitSeconds);
-                    limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-                    limiter.QueueLimit = 0;
-                });
-            });
-    }
-
-    public static IServiceCollection AddHealthCheckOutputCache(this IServiceCollection services, int expirationSeconds)
-    {
-        return services
-            .AddOutputCache(o => o
-                .AddPolicy(HealthCheckProperties.Configuration.OutputCacheKey, policy =>
-                {
-                    policy.Expire(TimeSpan.FromSeconds(expirationSeconds));
-                    policy.SetVaryByHeader(HealthCheckProperties.Headers.AuthorizationKey);
-                    policy.Cache();
-                }));
-    }
-
-    public static WebApplication MapHealthCheckEndpoints(this WebApplication app, HealthCheckEndpointOptions options)
-    {
-        return app
-            .MapLivenessEndpoint(options.ServiceName, options.Version)
-            .MapReadinessEndpoint(HealthCheckProperties.Endpoints.Readiness, options.Token)
-            .MapReadinessEndpoint(HealthCheckProperties.Endpoints.Status, options.Token);
-    }
-
-    private static WebApplication MapLivenessEndpoint(this WebApplication app, string name, string version)
-    {
-        app
-            .MapGet(HealthCheckProperties.Endpoints.Liveness, () => Results.Ok(new
-            {
-                version,
-                Name = name.ToSlugCase(),
-                Timestamp = DateTime.UtcNow
-            }))
-            .ExcludeFromDescription()
-            .RequireRateLimiting(HealthCheckProperties.Configuration.RateLimitingKey);
-
-        return app;
-    }
-
-    private static WebApplication MapReadinessEndpoint(this WebApplication app, string path, string expectedKey)
-    {
-        var criticalOnly = path.IsEqualTo(HealthCheckProperties.Endpoints.Readiness);
-
-        var options = new HealthCheckOptions
+        foreach (var (name, dependency) in dependencies)
         {
-            Predicate = check => ContainsReadinessTags(check, criticalOnly),
-            AllowCachingResponses = true,
-            ResultStatusCodes = _resultStatusCodes,
-            ResponseWriter = criticalOnly
-                ? SimplifiedHealthCheckReadinessReport.WriteResponseAsync
-                : HealthCheckReadinessReport.WriteResponseAsync
-        };
+            if (dependency.HealthCheck is not null)
+                healthChecks.AddAuroreHttpDependencyCheck(appInfo, name, dependency.BaseUrl, dependency.HealthCheck);
+        }
 
-        var name = $"HealthCheck{path.Split('/').Last().ToSentenceCase()}";
-
-        app.MapHealthChecks(path, options)
-            .WithName(name)
-            .WithSummary(name.ToSentenceCase())
-            .CacheOutput(HealthCheckProperties.Configuration.OutputCacheKey)
-            .RequireRateLimiting(HealthCheckProperties.Configuration.RateLimitingKey)
-            .AddEndpointFilter(async (context, next) =>
-            {
-                var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(HealthCheckConfiguration));
-
-                var hasKey = context.HttpContext.Request.Headers.TryGetValue(HealthCheckProperties.Headers.AuthorizationKey, out var key);
-
-                if (hasKey && key.ToString().IsEqualTo(expectedKey))
-                    return await next(context);
-
-                logger.LogWarning("Unauthorized access attempt to readiness endpoint");
-
-                return Results.Unauthorized();
-            });
-
-        return app;
-    }
-
-    private static bool ContainsReadinessTags(HealthCheckRegistration check, bool onlyCritical)
-    {
-        var ready = HealthCheckProperties.Tags.Readiness;
-
-        return onlyCritical
-            ? check.Tags.Contains(ready) && check.Tags.Contains(HealthCheckProperties.Tags.Critical)
-            : check.Tags.Contains(ready);
-    }
-}
-
-public static class HttpServiceHealthCheckConfiguration
-{
-    public static IServiceCollection AddHttpServiceHealthCheck(
-        this IServiceCollection services, string name, HttpServiceDependencyOptions options)
-    {
-        var opts = new
-        {
-            Name = name.ToSlugCase(),
-            options.BaseUrl,
-            ReadinessEndpoint = (options.HealthCheck!.ReadinessEndpoint ?? HealthCheckProperties.Endpoints.Readiness).TrimStart('/'),
-            Timeout = TimeSpan.FromSeconds(options.HealthCheck!.TimeoutSeconds),
-            FailureStatus = options.HealthCheck!.IsCritical ? HealthStatus.Unhealthy : HealthStatus.Degraded,
-            Tags = new List<string> {
-                HealthCheckProperties.Tags.Readiness,
-                HealthCheckProperties.Tags.TypeHttpService,
-                options.HealthCheck!.IsCritical ? HealthCheckProperties.Tags.Critical : HealthCheckProperties.Tags.NonCritical
-            }.Concat(options.HealthCheck!.Tags.Select(x => x.ToSlugCase())),
-        };
-
-        services.AddHttpClient($"hc-{opts.Name}", client =>
-        {
-            client.DefaultRequestHeaders.Add(HealthCheckProperties.Headers.Client, opts.Name);
-            client.BaseAddress = new Uri($"{options.BaseUrl}/{opts.ReadinessEndpoint}");
-            client.Timeout = opts.Timeout;
-        });
-
-        services
-            .AddHealthChecks()
-            .AddCheck<HttpServiceHealthCheck>(name, opts.FailureStatus, opts.Tags, opts.Timeout);
+        // Named policy only: it doesn't change output caching for the rest of the application.
+        services.AddOutputCache(o => o
+            .AddPolicy(HealthCheckProperties.Configuration.OutputCacheKey, policy => policy
+                .Expire(TimeSpan.FromSeconds(options.CacheSeconds))
+                .Cache()));
 
         return services;
     }
+
+    // /health/live    The process is up. Anonymous and never touches dependencies, so it is safe for frequent probes.
+    // /health/ready   Critical dependencies only, status without details. Anonymous, for load balancers and orchestrators.
+    // /health/status  All dependencies with details. Requires an authenticated caller since it reveals dependency names.
+    //
+    // HTTP status codes use the framework defaults: Healthy and Degraded return 200, Unhealthy returns 503.
+    // Non-critical dependencies are registered with a Degraded failure status, so they never make the service Unhealthy.
+    public static WebApplication MapAuroreHealthChecks(this WebApplication app, AppInformationOptions appInfo)
+    {
+        var serviceName = appInfo.Component.ToSlugCase();
+
+        app.MapGet(HealthCheckProperties.Endpoints.Liveness, () => Results.Ok(LivenessReport.Create(serviceName, appInfo.Version)))
+            .WithName("HealthCheckLiveness")
+            .ExcludeFromDescription();
+
+        app.MapHealthChecks(HealthCheckProperties.Endpoints.Readiness, CreateOptions(IsCriticalReadinessCheck, includeDependencies: false))
+            .WithName("HealthCheckReadiness")
+            .CacheOutput(HealthCheckProperties.Configuration.OutputCacheKey);
+
+        app.MapHealthChecks(HealthCheckProperties.Endpoints.Status, CreateOptions(IsReadinessCheck, includeDependencies: true))
+            .WithName("HealthCheckStatus")
+            .CacheOutput(HealthCheckProperties.Configuration.OutputCacheKey)
+            .RequireAuthorization();
+
+        return app;
+    }
+
+    private static HealthCheckOptions CreateOptions(Func<HealthCheckRegistration, bool> predicate, bool includeDependencies)
+    {
+        return new HealthCheckOptions
+        {
+            Predicate = predicate,
+            AllowCachingResponses = true,
+            ResponseWriter = (context, report) => context.Response.WriteAsJsonAsync(
+                HealthCheckReport.From(report, includeDependencies),
+                context.RequestAborted),
+        };
+    }
+
+    private static bool IsReadinessCheck(HealthCheckRegistration check)
+    {
+        return check.Tags.Contains(HealthCheckProperties.Tags.Readiness);
+    }
+
+    private static bool IsCriticalReadinessCheck(HealthCheckRegistration check)
+    {
+        return IsReadinessCheck(check) && check.Tags.Contains(HealthCheckProperties.Tags.Critical);
+    }
 }
 
-public sealed class HttpServiceHealthCheck(ILogger<HttpServiceHealthCheck> logger, IHttpClientFactory clientFactory) : IHealthCheck
+public static class HttpDependencyHealthCheckConfiguration
 {
-    public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context, CancellationToken cancellationToken = default)
+    public static IHealthChecksBuilder AddAuroreHttpDependencyCheck(
+        this IHealthChecksBuilder builder,
+        AppInformationOptions appInfo,
+        string name,
+        string baseUrl,
+        HttpDependencyHealthCheckOptions options)
     {
+        var checkName = name.ToSlugCase();
+
+        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out _) is false)
+            throw new InvalidOperationException($"Dependency '{checkName}' has an invalid BaseUrl '{baseUrl}'. It must be an absolute URL, e.g. 'https://orders.internal'.");
+
+        if (options.TimeoutSeconds <= 0)
+            throw new InvalidOperationException($"Dependency '{checkName}' has an invalid health check TimeoutSeconds '{options.TimeoutSeconds}'. It must be greater than zero.");
+
+        var timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        var failureStatus = options.IsCritical ? HealthStatus.Unhealthy : HealthStatus.Degraded;
+
+        var tags = new[]
+            {
+                HealthCheckProperties.Tags.Readiness,
+                HealthCheckProperties.Tags.TypeHttpService,
+                options.IsCritical ? HealthCheckProperties.Tags.Critical : HealthCheckProperties.Tags.NonCritical,
+            }
+            .Concat(options.Tags.Select(x => x.ToSlugCase()))
+            .Distinct(StringComparer.Ordinal);
+
+        builder.Services.AddHttpClient(HttpDependencyHealthCheck.GetClientName(checkName), client =>
+        {
+            client.BaseAddress = new Uri($"{baseUrl.TrimEnd('/')}/{options.ReadinessEndpoint.TrimStart('/')}");
+            client.Timeout = timeout;
+            client.DefaultRequestHeaders.Add(HealthCheckProperties.Headers.Client, appInfo.Component.ToSlugCase());
+        });
+
+        return builder.AddCheck<HttpDependencyHealthCheck>(checkName, failureStatus, tags, timeout);
+    }
+}
+
+public sealed class HttpDependencyHealthCheck(ILogger<HttpDependencyHealthCheck> logger, IHttpClientFactory clientFactory) : IHealthCheck
+{
+    private const string ClientNamePrefix = "health-check-";
+
+    public static string GetClientName(string checkName)
+    {
+        return $"{ClientNamePrefix}{checkName}";
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        var name = context.Registration.Name;
+        var failureStatus = context.Registration.FailureStatus;
+
         try
         {
-            var httpClient = clientFactory.CreateClient($"hc-{context.Registration.Name}");
+            var client = clientFactory.CreateClient(GetClientName(name));
 
-            var response = await httpClient.GetAsync(string.Empty, cancellationToken).ConfigureAwait(false);
+            using var response = await client.GetAsync(string.Empty, cancellationToken).ConfigureAwait(false);
 
-            return response.IsSuccessStatusCode ? HealthCheckResult.Healthy() : Failure();
+            if (response.IsSuccessStatusCode)
+                return HealthCheckResult.Healthy();
+
+            logger.LogWarning("Health check for dependency {DependencyName} returned status code {StatusCode}.", name, (int)response.StatusCode);
+
+            return new HealthCheckResult(failureStatus, $"Dependency returned status code {(int)response.StatusCode}.");
         }
         catch (Exception ex)
         {
-            return Failure(ex);
-        }
+            logger.LogWarning(ex, "Health check for dependency {DependencyName} could not reach the dependency.", name);
 
-        HealthCheckResult Failure(Exception? ex = null)
-        {
-            logger.LogError(ex, "Error while trying to reach service {ServiceName}.", context.Registration.Name);
-
-            return new HealthCheckResult(context.Registration.FailureStatus, "An upstream service returned an invalid response.", ex);
+            return new HealthCheckResult(failureStatus, "Dependency could not be reached.", ex);
         }
     }
 }
 
-public record SimplifiedHealthCheckReadinessReport
+public sealed record LivenessReport
+{
+    public required string Name { get; init; }
+    public required string Version { get; init; }
+    public required DateTime Timestamp { get; init; }
+
+    public static LivenessReport Create(string name, string version)
+    {
+        return new()
+        {
+            Name = name,
+            Version = version,
+            Timestamp = DateTime.UtcNow,
+        };
+    }
+}
+
+public sealed record HealthCheckReport
 {
     public required HealthStatus Status { get; init; }
     public required TimeSpan TotalDuration { get; init; }
-    public static DateTime Timestamp => DateTime.UtcNow;
+    public required DateTime Timestamp { get; init; }
 
-    public static async Task WriteResponseAsync(HttpContext context, HealthReport report)
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<DependencyReport>? Dependencies { get; init; }
+
+    public static HealthCheckReport From(HealthReport report, bool includeDependencies)
     {
-        var response = new SimplifiedHealthCheckReadinessReport
+        return new()
         {
-            Status = GetStatus(report),
-            TotalDuration = report.TotalDuration
-        };
-
-        await context.Response.WriteAsJsonAsync(response, context.RequestAborted);
-    }
-
-    protected static HealthStatus GetStatus(HealthReport report)
-    {
-        var status = report.Status;
-
-        if (status == HealthStatus.Unhealthy)
-            status = HasCriticalUnhealthy() ? HealthStatus.Unhealthy : HealthStatus.Degraded;
-
-        return status;
-
-        bool HasCriticalUnhealthy()
-        {
-            return report.Entries.Any(x =>
-                x.Value.Tags.Contains(HealthCheckProperties.Tags.Critical) &&
-                x.Value.Status is not HealthStatus.Healthy);
-        }
-    }
-}
-
-public sealed record HealthCheckReadinessReport : SimplifiedHealthCheckReadinessReport
-{
-    public IEnumerable<DependencyReport> Dependencies { get; init; } = [];
-
-    public static new async Task WriteResponseAsync(HttpContext context, HealthReport report)
-    {
-        var response = new HealthCheckReadinessReport
-        {
-            Status = GetStatus(report),
+            Status = report.Status,
             TotalDuration = report.TotalDuration,
-            Dependencies = [.. report.Entries.Select(DependencyReport.From)]
+            Timestamp = DateTime.UtcNow,
+            Dependencies = includeDependencies ? report.Entries.Select(DependencyReport.From).ToList() : null,
         };
-
-        await context.Response.WriteAsJsonAsync(response, context.RequestAborted);
     }
 }
+
 public sealed record DependencyReport
 {
     public required string Name { get; init; }
     public required HealthStatus Status { get; init; }
+    public string? Description { get; init; }
     public required TimeSpan Duration { get; init; }
     public required string[] Tags { get; init; }
 
@@ -675,8 +682,9 @@ public sealed record DependencyReport
         {
             Name = entry.Key,
             Status = entry.Value.Status,
+            Description = entry.Value.Description,
             Duration = entry.Value.Duration,
-            Tags = [.. entry.Value.Tags]
+            Tags = [.. entry.Value.Tags],
         };
     }
 }

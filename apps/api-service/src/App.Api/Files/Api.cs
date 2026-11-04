@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Aurore.Blueprints.ApiService.Core;
 using Aurore.Foundation.AspNetCore;
 using Aurore.Foundation.Core;
@@ -61,22 +60,5 @@ internal static class ScalarConfiguration
             .WithDefaultHttpClient(ScalarTarget.Shell, ScalarClient.Curl));
 
         return app;
-    }
-}
-
-internal static class HealthCheckConfiguration
-{
-    internal static IServiceCollection AddHealthChecks(this IServiceCollection services, AppSettings appSettings)
-    {
-        var options = appSettings.Security.HealthCheck;
-
-        services // AI: Maybe rename these properties? I don't know.
-            .AddHealthCheckRateLimiter(options.RateLimitPermitCount, options.RateLimitWindowSeconds)
-            .AddHealthCheckOutputCache(options.ReadinessCacheSeconds);
-
-        foreach (var service in appSettings.Services.Where(x => x.Value.HealthCheck is not null))
-            services.AddHttpServiceHealthCheck(service.Key, service.Value);
-
-        return services;
     }
 }
