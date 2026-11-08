@@ -5,14 +5,16 @@ using Aurore.Blueprints.ApiService.Infra.Configuration;
 using Aurore.Foundation.AspNetCore.Authentication.Configuration;
 using Aurore.Foundation.AspNetCore.Configuration;
 using Aurore.Foundation.AspNetCore.HealthChecks.Configuration;
+using Aurore.Foundation.AspNetCore.MinimalApis.Configuration;
 using Aurore.Foundation.AspNetCore.RequestPipeline.Configuration;
 using Aurore.Foundation.Core.Application;
 using Aurore.Foundation.Core.Application.Constants;
 using Aurore.Foundation.Telemetry.Configuration;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
+WebApplication app;
 
 try
 {
@@ -20,10 +22,11 @@ try
 
     builder
         .ConfigureAuroreSerializers()
-        .AddAppSettings(out var appSettings)
+        .LoadAppSettings(out var appSettings)
         .AddAuroreTelemetry(appSettings.AppInformation, appSettings.Telemetry)
-        .AddAppScalar(appSettings)
-        .AddAuroreCorsPolicies(appSettings.CorsPolicies);
+        .AddAuroreMinimalEndpoints<Program>(out var endpoints)
+        .AddAppScalar(appSettings, endpoints)
+        .AddAuroreCorsPolicies(appSettings.RequestPipeline.CorsPolicies);
 
     AppDiagnostics.Initialize(appSettings.AppInformation.ActivitySource);
 
@@ -33,11 +36,10 @@ try
         .ConfigureAuroreKestrelLimits(pipeline.KestrelLimits)
         .ConfigureAuroreForwardedHeaders(pipeline.ForwardedHeaders)
         .AddAuroreRequestContext()
-        .AddAuroreApiVersioning()
+        .AddAuroreApiVersioning(endpoints)
         .AddAuroreResponseCompression(pipeline.ResponseCompression)
-        .AddAuroreAuthentication(appSettings.IdentityProvider, appSettings.ApiKeys)
-        .AddAuthorization()
-        .AddAuroreHealthChecks(appSettings.AppInformation, appSettings.HealthChecks, appSettings.Dependencies)
+        .AddAuroreAuthConfiguration(appSettings.IdentityProvider, appSettings.ApiKeys)
+        .AddAuroreHealthChecks(appSettings.AppInformation, appSettings.HealthChecks, appSettings.HttpDependencies)
         .AddAuroreRequestTimeouts(pipeline.Timeouts)
         .AddAuroreRateLimiting(pipeline.RateLimiting)
         .AddAuroreIdempotency(pipeline.Idempotency)
@@ -46,7 +48,7 @@ try
         .AddAppFeatures(appSettings)
         .AddAppInfra(appSettings);
 
-    var app = builder.Build();
+    app = builder.Build();
 
     app.UseAppScalar(appSettings);
 
@@ -58,7 +60,7 @@ try
         .UseHttpsRedirection()
         .UseAuroreResponseCompression(pipeline.ResponseCompression)
         .UseCors()
-        .UseAuroreMaintenanceMode(appSettings.MaintenanceMode)
+        .UseAuroreMaintenanceMode(pipeline.MaintenanceMode)
         .UseAuthentication()
         .UseAuthorization()
         .UseRateLimiter()
@@ -67,8 +69,17 @@ try
 
     app.MapAuroreHealthChecks(appSettings.AppInformation);
 
-    app.MapAppResources();
+    app.MapAppResources(endpoints);
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Console.Error.WriteLine($"Application failed to start: {ex}");
 
+    return ExitCodes.ConfigurationError;
+}
+
+try
+{
     app.Logger.LogInformation("Application is starting up...");
 
     app.Run();
@@ -77,7 +88,7 @@ try
 }
 catch (Exception ex) when (ex is not HostAbortedException)
 {
-    Console.Error.WriteLine($"Application failed with message: {ex}");
+    Console.Error.WriteLine($"Application stopped unexpectedly: {ex}");
 
-    return ExitCodes.ConfigurationError;
+    return ExitCodes.RuntimeError;
 }

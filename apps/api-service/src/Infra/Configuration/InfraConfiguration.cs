@@ -19,7 +19,7 @@ public static class InfraConfiguration
 
     private static IServiceCollection AddAppHttpDependencies(this IServiceCollection services, AppSettings appSettings)
     {
-        var dependencies = appSettings.Dependencies;
+        var dependencies = appSettings.HttpDependencies;
 
         // Typed, anonymous.
         services.AddAuroreHttpDependency<IGitHubClient, GitHubClient>(HttpDependencyNames.GitHub, dependencies.GetRequired(HttpDependencyNames.GitHub));

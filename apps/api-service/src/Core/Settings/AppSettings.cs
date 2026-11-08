@@ -11,12 +11,11 @@ namespace Aurore.Blueprints.ApiService.Core.Settings;
 public sealed record AppSettings
 {
     public required AppInformationOptions AppInformation { get; init; }
-    public IReadOnlyDictionary<string, CorsPolicyOptions> CorsPolicies { get; init; } = new Dictionary<string, CorsPolicyOptions>();
+    public ApiDocsOptions ApiDocs { get; init; } = new();
     public required IdentityProviderOptions IdentityProvider { get; init; }
     public ApiKeysOptions ApiKeys { get; init; } = new();
     public required TelemetryOptions Telemetry { get; init; }
     public HealthChecksOptions HealthChecks { get; init; } = new();
     public RequestPipelineOptions RequestPipeline { get; init; } = new();
-    public MaintenanceModeOptions MaintenanceMode { get; init; } = new();
-    public IReadOnlyDictionary<string, HttpDependencyOptions> Dependencies { get; init; } = new Dictionary<string, HttpDependencyOptions>();
+    public IReadOnlyDictionary<string, HttpDependencyOptions> HttpDependencies { get; init; } = new Dictionary<string, HttpDependencyOptions>();
 }

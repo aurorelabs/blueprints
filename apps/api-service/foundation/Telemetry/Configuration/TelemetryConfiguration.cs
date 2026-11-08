@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using Aurore.Foundation.Core.Application.Models;
+using Aurore.Foundation.Core.Constants;
 using Aurore.Foundation.Core.Extensions;
 using Aurore.Foundation.Telemetry.Constants;
 using Aurore.Foundation.Telemetry.Models;
@@ -21,6 +21,9 @@ namespace Aurore.Foundation.Telemetry.Configuration;
 public static class TelemetryConfiguration
 {
     private const string PostgresSourceName = "Npgsql";
+    private const string OtlpTraceSignal = "traces";
+    private const string OtlpMetricSignal = "metrics";
+    private const string OtlpLogSignal = "logs";
 
     /// <summary>
     /// Registers OpenTelemetry logs, metrics and traces exported over OTLP, plus a console logger (single lines in
@@ -30,23 +33,9 @@ public static class TelemetryConfiguration
     {
         builder.Logging.ClearProviders();
 
-        if (builder.Environment.IsDevelopment())
-        {
-            builder.Logging.AddSimpleConsole(o =>
-            {
-                o.SingleLine = true;
-                o.TimestampFormat = "HH:mm:ss ";
-            });
-        }
-        else
-        {
-            builder.Logging.AddJsonConsole(o =>
-            {
-                o.IncludeScopes = true;
-                o.UseUtcTimestamp = true;
-                o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
-            });
-        }
+        AddConsoleLogger(builder);
+
+        builder.Services.AddHostedService(provider => new TelemetryStartupLogger(provider.GetRequiredService<ILogger<TelemetryStartupLogger>>(), telemetry));
 
         builder.Services
             .AddOpenTelemetry()
@@ -56,6 +45,27 @@ public static class TelemetryConfiguration
             .ConfigureTracing(appInfo, telemetry);
 
         return builder;
+
+        static void AddConsoleLogger(IHostApplicationBuilder builder)
+        {
+            if (builder.Environment.IsDevelopment())
+            {
+                builder.Logging.AddSimpleConsole(o =>
+                {
+                    o.SingleLine = true;
+                    o.TimestampFormat = TimestampFormats.TimeOnlyWithTrailingSpace;
+                });
+            }
+            else
+            {
+                builder.Logging.AddJsonConsole(o =>
+                {
+                    o.IncludeScopes = true;
+                    o.UseUtcTimestamp = true;
+                    o.TimestampFormat = TimestampFormats.Iso8601.UtcWithMilliseconds;
+                });
+            }
+        }
     }
 
     private static OpenTelemetryBuilder ConfigureAppResource(this OpenTelemetryBuilder builder, IHostEnvironment env, AppInformationOptions appInfo, TelemetryOptions telemetry)
@@ -80,9 +90,19 @@ public static class TelemetryConfiguration
     {
         return builder
             .WithLogging(
-                logging => logging.AddOtlpExporter(ConfigureOtlpExporter(telemetry)),
+                logging => logging.AddOtlpExporter((exporter, processor) =>
+                {
+                    ConfigureOtlpExporter(telemetry, OtlpLogSignal)(exporter);
+
+                    var batch = telemetry.Logging.BatchExport;
+                    processor.BatchExportProcessorOptions.MaxQueueSize = batch.MaxQueueSize;
+                    processor.BatchExportProcessorOptions.MaxExportBatchSize = batch.MaxExportBatchSize;
+                    processor.BatchExportProcessorOptions.ScheduledDelayMilliseconds = ToMilliseconds(batch.ScheduledDelaySeconds);
+                    processor.BatchExportProcessorOptions.ExporterTimeoutMilliseconds = ToMilliseconds(batch.ExportTimeoutSeconds);
+                }),
                 options =>
                 {
+                    options.IncludeFormattedMessage = true;
                     options.IncludeScopes = telemetry.Logging.IncludeScopes;
                     options.ParseStateValues = telemetry.Logging.ParseStateValues;
                 });
@@ -99,7 +119,14 @@ public static class TelemetryConfiguration
                     .AddRuntimeInstrumentation()
                     .AddProcessInstrumentation()
                     .AddMeter(PostgresSourceName)
-                    .AddOtlpExporter(ConfigureOtlpExporter(telemetry));
+                    // Custom meters are registered here: see docs/telemetry.md ("add a custom metric").
+                    .AddOtlpExporter((exporter, reader) =>
+                    {
+                        ConfigureOtlpExporter(telemetry, OtlpMetricSignal)(exporter);
+
+                        reader.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = ToMilliseconds(telemetry.Metrics.ExportIntervalSeconds);
+                        reader.PeriodicExportingMetricReaderOptions.ExportTimeoutMilliseconds = ToMilliseconds(telemetry.Metrics.ExportTimeoutSeconds);
+                    });
 
                 if (telemetry.Metrics.ExportToConsole)
                     metrics.AddConsoleExporter();
@@ -108,7 +135,7 @@ public static class TelemetryConfiguration
 
     private static OpenTelemetryBuilder ConfigureTracing(this OpenTelemetryBuilder builder, AppInformationOptions appInfo, TelemetryOptions telemetry)
     {
-        var sampler = new ParentBasedSampler(new TraceIdRatioBasedSampler(telemetry.Tracing.TraceIdRatioBasedSampler));
+        var sampler = new ParentBasedSampler(new TraceIdRatioBasedSampler(telemetry.Tracing.SamplingRatio));
 
         return builder
             .WithTracing(tracing =>
@@ -117,31 +144,64 @@ public static class TelemetryConfiguration
                     .AddSource(appInfo.ActivitySource)
                     .AddSource(OpenTelemetryProperties.Sources.Infrastructure)
                     .AddSource(PostgresSourceName)
+                    // Additional ActivitySources are registered here: see docs/telemetry.md ("add a trace source").
                     .SetSampler(sampler)
-                    .AddIncomingTrafficInstrumentation(telemetry.Tracing.IncomingTrafficFilters)
-                    .AddOutgoingTrafficInstrumentation(telemetry.Tracing.OutgoingTrafficFilters)
+                    .AddIncomingTrafficInstrumentation(telemetry.Tracing.ExcludedIncomingPaths)
+                    .AddOutgoingTrafficInstrumentation(telemetry.Tracing.ExcludedOutgoingPaths)
                     .SetErrorStatusOnException()
-                    .AddOtlpExporter(ConfigureOtlpExporter(telemetry));
+                    .AddOtlpExporter(exporter =>
+                    {
+                        ConfigureOtlpExporter(telemetry, OtlpTraceSignal)(exporter);
+
+                        var batch = telemetry.Tracing.BatchExport;
+                        exporter.BatchExportProcessorOptions.MaxQueueSize = batch.MaxQueueSize;
+                        exporter.BatchExportProcessorOptions.MaxExportBatchSize = batch.MaxExportBatchSize;
+                        exporter.BatchExportProcessorOptions.ScheduledDelayMilliseconds = ToMilliseconds(batch.ScheduledDelaySeconds);
+                        exporter.BatchExportProcessorOptions.ExporterTimeoutMilliseconds = ToMilliseconds(batch.ExportTimeoutSeconds);
+                    });
 
                 if (telemetry.Tracing.ExportToConsole)
                     tracing.AddConsoleExporter();
             });
     }
 
-    private static Action<OtlpExporterOptions> ConfigureOtlpExporter(TelemetryOptions telemetry)
+    private static Action<OtlpExporterOptions> ConfigureOtlpExporter(TelemetryOptions telemetry, string signal)
     {
         return x =>
         {
-            x.Endpoint = new Uri(telemetry.CollectorEndpoint);
-            x.Protocol = telemetry.Protocol.ParseEnum<OtlpExportProtocol>();
-            x.Headers = telemetry.Headers;
+            var otlp = telemetry.Otlp;
+            var protocol = otlp.Protocol.ParseEnum<OtlpExportProtocol>();
+
+            x.Endpoint = BuildOtlpEndpoint(otlp.Endpoint, protocol, signal);
+            x.Protocol = protocol;
+            x.Headers = otlp.Headers;
+            x.TimeoutMilliseconds = ToMilliseconds(otlp.RequestTimeoutSeconds);
         };
     }
 
-    private static TracerProviderBuilder AddOutgoingTrafficInstrumentation(
-        this TracerProviderBuilder builder, IEnumerable<string> pathsFilter, Func<HttpRequestMessage, bool>? requestFilter = null)
+    /// <summary>
+    /// Settings are in seconds; the OpenTelemetry SDK takes milliseconds.
+    /// </summary>
+    private static int ToMilliseconds(int seconds)
     {
-        var excludedPaths = CreatePathsFilter(pathsFilter);
+        return (int)TimeSpan.FromSeconds(seconds).TotalMilliseconds;
+    }
+
+    /// <summary>
+    /// gRPC uses the collector endpoint as-is. HTTP/protobuf needs the per-signal path (/v1/traces, /v1/metrics,
+    /// /v1/logs) because the SDK does not append it when the endpoint is set in code.
+    /// </summary>
+    internal static Uri BuildOtlpEndpoint(string collectorEndpoint, OtlpExportProtocol protocol, string signal)
+    {
+        return protocol == OtlpExportProtocol.HttpProtobuf
+            ? new Uri($"{collectorEndpoint.TrimEnd('/')}/v1/{signal}")
+            : new Uri(collectorEndpoint);
+    }
+
+    private static TracerProviderBuilder AddOutgoingTrafficInstrumentation(
+        this TracerProviderBuilder builder, IEnumerable<string> configuredExcludedPaths)
+    {
+        var excludedPaths = WithHealthChecks(configuredExcludedPaths);
 
         return builder
             .AddHttpClientInstrumentation(options =>
@@ -154,18 +214,15 @@ public static class TelemetryConfiguration
 
                     var path = request.RequestUri.PathAndQuery;
 
-                    if (excludedPaths.Any(x => path.StartsWith(x, StringComparison.OrdinalIgnoreCase)))
-                        return false;
-
-                    return requestFilter is null || requestFilter(request);
+                    return !excludedPaths.Any(x => path.StartsWith(x, StringComparison.OrdinalIgnoreCase));
                 };
             });
     }
 
     private static TracerProviderBuilder AddIncomingTrafficInstrumentation(
-        this TracerProviderBuilder builder, IEnumerable<string> pathsFilter)
+        this TracerProviderBuilder builder, IEnumerable<string> configuredExcludedPaths)
     {
-        var excludedPaths = CreatePathsFilter(pathsFilter);
+        var excludedPaths = WithHealthChecks(configuredExcludedPaths);
 
         return builder
             .AddAspNetCoreInstrumentation(options =>
@@ -173,18 +230,18 @@ public static class TelemetryConfiguration
                 options.RecordException = true;
                 options.Filter = context =>
                 {
-                    var path = context.Request.Path.Value;
-
-                    if (path is null)
-                        return false;
+                    var path = context.Request.Path.Value ?? string.Empty;
 
                     return !excludedPaths.Any(x => path.StartsWith(x, StringComparison.OrdinalIgnoreCase));
                 };
             });
     }
 
-    private static string[] CreatePathsFilter(IEnumerable<string> paths)
+    /// <summary>
+    /// Health probes are frequent and uninteresting, so they are never traced, whatever is configured.
+    /// </summary>
+    private static string[] WithHealthChecks(IEnumerable<string> excludedPaths)
     {
-        return [.. paths.Concat(["/health/"])];
+        return [.. excludedPaths.Concat(["/health/"])];
     }
 }

@@ -49,7 +49,7 @@ public static class CorsConfiguration
         if (policies.Count == 0)
         {
             if (isProduction)
-                throw new InvalidOperationException("No CORS policies are configured. Production requires at least one explicit CORS policy in the 'CorsPolicies' configuration section.");
+                throw new InvalidOperationException("No CORS policies are configured. Production requires at least one explicit CORS policy in the 'RequestPipeline:CorsPolicies' configuration section.");
 
             builder.Services.AddAllowAllCorsPolicy();
 

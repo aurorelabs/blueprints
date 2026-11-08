@@ -1,3 +1,4 @@
+using Aurore.Foundation.AspNetCore.MinimalApis;
 using Aurore.Foundation.AspNetCore.MinimalApis.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,9 +9,9 @@ internal static class ResourcesConfiguration
 {
     internal const string ConfiguredByHeader = "X-Configured-By";
 
-    internal static WebApplication MapAppResources(this WebApplication app)
+    internal static WebApplication MapAppResources(this WebApplication app, MinimalEndpointCatalog endpoints)
     {
-        app.MapAuroreResourcesFromAssembly<Program>(api => api
+        app.MapAuroreMinimalEndpoints(endpoints, api => api
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
 
             // Layering demo (see Examples.http); remove when no longer needed.

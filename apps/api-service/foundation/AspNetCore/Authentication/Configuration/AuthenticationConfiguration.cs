@@ -18,7 +18,7 @@ public static class AuthenticationConfiguration
     /// With both, every RequireAuthorization()/RequireAuroreScope()/RequireAuroreRole() accepts either kind of caller.
     /// Pin one with policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme or ApiKeyDefaults.AuthenticationScheme).
     /// </summary>
-    public static IServiceCollection AddAuroreAuthentication(this IServiceCollection services, IdentityProviderOptions identityProvider, ApiKeysOptions apiKeys)
+    public static IServiceCollection AddAuroreAuthConfiguration(this IServiceCollection services, IdentityProviderOptions identityProvider, ApiKeysOptions apiKeys)
     {
         var useApiKeys = apiKeys.Clients.Count > 0;
         var defaultScheme = useApiKeys ? AuroreAuthenticationDefaults.BearerOrApiKeyScheme : JwtBearerDefaults.AuthenticationScheme;
@@ -35,6 +35,8 @@ public static class AuthenticationConfiguration
                 options.Audience = identityProvider.Audience;
                 options.RequireHttpsMetadata = identityProvider.RequireHttpsMetadata;
             });
+
+        services.AddAuthorization();
 
         if (useApiKeys is false)
             return services;

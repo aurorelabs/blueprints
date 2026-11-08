@@ -12,7 +12,7 @@ public static class CompressionConfiguration
 {
     public static IServiceCollection AddAuroreResponseCompression(this IServiceCollection services, ResponseCompressionConfigurationOptions options)
     {
-        if (options.IsEnabled is false)
+        if (options.Enabled is false)
             return services;
 
         return services
@@ -35,6 +35,6 @@ public static class CompressionConfiguration
     /// </summary>
     public static IApplicationBuilder UseAuroreResponseCompression(this IApplicationBuilder builder, ResponseCompressionConfigurationOptions options)
     {
-        return options.IsEnabled ? builder.UseResponseCompression() : builder;
+        return options.Enabled ? builder.UseResponseCompression() : builder;
     }
 }

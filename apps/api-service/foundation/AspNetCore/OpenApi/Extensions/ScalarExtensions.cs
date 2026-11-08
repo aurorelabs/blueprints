@@ -3,12 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using Asp.Versioning;
+using Aurore.Foundation.AspNetCore.Configuration;
 using Aurore.Foundation.AspNetCore.Constants;
+using Aurore.Foundation.AspNetCore.MinimalApis;
 using Aurore.Foundation.AspNetCore.OpenApi.Constants;
 using Aurore.Foundation.AspNetCore.RequestPipeline.Middlewares;
 using Aurore.Foundation.Core.Application.Models;
 using Aurore.Foundation.Core.Authentication.Models;
 using Aurore.Foundation.Core.Extensions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,29 +24,71 @@ namespace Aurore.Foundation.AspNetCore.OpenApi.Extensions;
 
 public static class ScalarExtensions
 {
-    public static string[] ConfigureAuroreScalarDocuments(this IHostApplicationBuilder builder, params int[] versions)
+    /// <summary>
+    /// OpenAPI document name for a version (v1, v2...); built with the same format the API explorer uses for its groups,
+    /// so a document always matches the endpoints of its version.
+    /// </summary>
+    public static string DocumentName(int version)
     {
-        var documents = versions.Select(v => new ScalarDocument($"v{v}", $"Version {v}"));
+        return new ApiVersion(version).ToString(VersioningConfiguration.GroupNameFormat);
+    }
+
+    /// <summary>
+    /// Registers one Scalar document per version, in the order given (the first one is the default).
+    /// </summary>
+    public static IHostApplicationBuilder ConfigureAuroreScalarDocuments(this IHostApplicationBuilder builder, IEnumerable<MinimalEndpointVersion> versions)
+    {
+        var documents = versions
+            .Select(v => new ScalarDocument(DocumentName(v.Number), v switch
+            {
+                { IsDeprecated: true } => $"Version {v.Number} (deprecated)",
+                _ => $"Version {v.Number}",
+            }))
+            .ToArray();
 
         builder.Services.Configure<ScalarOptions>(x => x.AddDocuments(documents));
 
-        return [.. documents.Select(x => x.Name)];
+        return builder;
     }
 
-    public static OpenApiOptions AddAuroreDocumentInfo(this OpenApiOptions options, string apiVersion, AppInformationOptions appInfo)
+    /// <summary>
+    /// Pre-configures the "Authorize" button for the OAuth2 authorization code flow with PKCE, so signing in from the
+    /// documentation redirects to the identity provider without pasting anything. Does nothing without a client id.
+    /// </summary>
+    public static ScalarOptions WithAuroreAuthentication(this ScalarOptions options, IdentityProviderOptions identityProvider, ApiDocsOptions apiDocs)
     {
-        var companyName = "aurorelabs";
+        if (apiDocs.OAuthClientId.HasValue() is false)
+            return options;
+
+        return options
+            .AddPreferredSecuritySchemes([SecuritySchemes.OAuth2])
+            .AddAuthorizationCodeFlow(SecuritySchemes.OAuth2, flow => flow
+                .WithClientId(apiDocs.OAuthClientId)
+                .WithPkce(Pkce.Sha256)
+                .WithSelectedScopes(identityProvider.Scopes.Keys));
+    }
+
+    public static OpenApiOptions AddAuroreDocumentInfo(this OpenApiOptions options, MinimalEndpointVersion version, AppInformationOptions appInfo)
+    {
+        var notice = version switch
+        {
+            { IsDeprecated: true, Sunset: { } sunset } => $"**Deprecated.** This version stops being served on {sunset:yyyy-MM-dd}.",
+            { IsDeprecated: true } => "**Deprecated.**",
+            _ => null,
+        };
+
+        var description = string.Join("\n\n", new[] { appInfo.Description, version.Description, notice }.Where(x => string.IsNullOrWhiteSpace(x) is false));
 
         return options.AddDocumentTransformer((doc, _, _) =>
         {
             doc.Info.Title = $"{appInfo.Component.ToTitleCase()} API";
-            doc.Info.Description = appInfo.Description;
-            doc.Info.Version = apiVersion;
+            doc.Info.Description = description;
+            doc.Info.Version = $"{version.Number}.0";
             doc.Info.Contact = new()
             {
                 Name = appInfo.Maintainer.Name,
                 Email = appInfo.Maintainer.Email,
-                Url = new Uri($"https://{companyName}.com/teams/{appInfo.Maintainer.Name}")
+                Url = appInfo.Maintainer.Url is { Length: > 0 } url ? new Uri(url) : null
             };
 
             return Task.CompletedTask;
@@ -53,22 +100,38 @@ public static class ScalarExtensions
         if (schema.Name.HasValue() is false)
             throw new ArgumentException("Security scheme must have a valid Name property.", nameof(schema));
 
-        return options.AddDocumentTransformer((document, _, _) =>
-        {
-            document.Components ??= new OpenApiComponents();
-            document.Security ??= [];
-
-            document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-
-            document.Components.SecuritySchemes[schema.Name] = schema;
-
-            document.Security.Add(new()
+        return options
+            .AddDocumentTransformer((document, _, _) =>
             {
-                { new(schema.Name, document), [.. scopes] }
-            });
+                document.Components ??= new OpenApiComponents();
+                document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
 
-            return Task.CompletedTask;
-        });
+                document.Components.SecuritySchemes[schema.Name] = schema;
+
+                return Task.CompletedTask;
+            })
+            .AddOperationTransformer((operation, context, _) =>
+            {
+                // Group-level and endpoint-level RequireAuthorization()/AllowAnonymous() both end up in the endpoint metadata.
+                if (RequiresAuthorization(context.Description) is false)
+                    return Task.CompletedTask;
+
+                operation.Security ??= [];
+
+                operation.Security.Add(new()
+                {
+                    { new(schema.Name, context.Document), [.. scopes] }
+                });
+
+                return Task.CompletedTask;
+            });
+    }
+
+    private static bool RequiresAuthorization(ApiDescription description)
+    {
+        var metadata = description.ActionDescriptor.EndpointMetadata;
+
+        return metadata.OfType<IAuthorizeData>().Any() && metadata.OfType<IAllowAnonymous>().Any() is false;
     }
 
     public static OpenApiOptions AddAuroreJwtBearerSecurity(this OpenApiOptions options)

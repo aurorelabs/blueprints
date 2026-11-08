@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Tests.Integration" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\foundation\AspNetCore\AspNetCore.csproj" />
     <ProjectReference Include="..\..\foundation\Core\Core.csproj" />
     <ProjectReference Include="..\..\foundation\Telemetry\Telemetry.csproj" />

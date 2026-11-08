@@ -1,10 +1,11 @@
-using System;
 using System.Globalization;
 using Aurore.Blueprints.ApiService.Core.Settings;
+using Aurore.Foundation.Core.Authentication.Validators;
 using Aurore.Foundation.Core.Extensions;
+using Aurore.Foundation.Core.HttpDependencies.Validators;
+using Aurore.Foundation.Telemetry.Validators;
 using FluentValidation;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry.Exporter;
 
 namespace Aurore.Blueprints.ApiService.Core.Validators;
 
@@ -14,6 +15,7 @@ public sealed class AppSettingsValidator : AbstractValidator<AppSettings>
     public AppSettingsValidator(IHostEnvironment environment)
     {
         var isProduction = environment.IsProduction();
+
         RuleFor(x => x.AppInformation).NotNull().ChildRules(app =>
         {
             app.RuleFor(x => x.Domain).NotEmpty();
@@ -25,29 +27,13 @@ public sealed class AppSettingsValidator : AbstractValidator<AppSettings>
             {
                 maintainer.RuleFor(x => x.Name).NotEmpty();
                 maintainer.RuleFor(x => x.Email).NotEmpty().EmailAddress();
+                maintainer.RuleFor(x => x.Url).Must(x => x.IsAbsoluteUrl()).When(x => x.Url.HasValue())
+                    .WithMessage("'{PropertyValue}' is not an absolute URL.");
             });
         });
 
-        RuleFor(x => x.IdentityProvider).NotNull().ChildRules(identityProvider =>
-        {
-            identityProvider.RuleFor(x => x.AuthorityUrl).Must(BeAnAbsoluteUrl).WithMessage("'{PropertyValue}' is not an absolute URL.");
-
-            identityProvider.RuleFor(x => x.AuthorityUrl).Must(BeNonLocal).When(_ => isProduction)
-                .WithMessage("'{PropertyValue}' is a local address. Configure the production authority in appsettings.Production.json or environment variables.");
-            identityProvider.RuleFor(x => x.Audience).NotEmpty();
-            identityProvider.RuleFor(x => x.AuthorizationPath).NotEmpty();
-            identityProvider.RuleFor(x => x.TokenPath).NotEmpty();
-        });
-
-        RuleFor(x => x.Telemetry).NotNull().ChildRules(telemetry =>
-        {
-            telemetry.RuleFor(x => x.CollectorEndpoint).Must(BeAnAbsoluteUrl).WithMessage("'{PropertyValue}' is not an absolute URL.");
-
-            telemetry.RuleFor(x => x.CollectorEndpoint).Must(BeNonLocal).When(_ => isProduction)
-                .WithMessage("'{PropertyValue}' is a local address. Configure the production collector in appsettings.Production.json or environment variables.");
-            telemetry.RuleFor(x => x.Protocol).IsEnumName(typeof(OtlpExportProtocol), caseSensitive: false);
-            telemetry.RuleFor(x => x.Tracing.TraceIdRatioBasedSampler).InclusiveBetween(0, 1);
-        });
+        RuleFor(x => x.IdentityProvider).NotNull().SetValidator(new IdentityProviderOptionsValidator(isProduction));
+        RuleFor(x => x.Telemetry).NotNull().SetValidator(new TelemetryOptionsValidator(isProduction));
 
         RuleFor(x => x.HealthChecks.CacheSeconds).GreaterThanOrEqualTo(0);
 
@@ -61,21 +47,17 @@ public sealed class AppSettingsValidator : AbstractValidator<AppSettings>
                 .WithMessage("Production API keys must be at least 32 characters. Supply them through environment variables or a secret store.");
         });
 
-        RuleForEach(x => x.Dependencies).ChildRules(dependency =>
+        // Reported with the configuration key (HttpDependencies:Orders:BaseUrl), not a positional index.
+        RuleFor(x => x.HttpDependencies).Custom((dependencies, context) =>
         {
-            dependency.RuleFor(x => x.Value.BaseUrl).Must(BeAnAbsoluteUrl).WithMessage("'{PropertyValue}' is not an absolute URL.");
+            var validator = new HttpDependencyOptionsValidator(isProduction);
+
+            foreach (var (name, dependency) in dependencies)
+            {
+                foreach (var failure in validator.Validate(dependency).Errors)
+                    context.AddFailure($"HttpDependencies:{name}:{failure.PropertyName}", failure.ErrorMessage);
+            }
         });
-    }
-
-    private static bool BeAnAbsoluteUrl(string? value)
-    {
-        return Uri.TryCreate(value, UriKind.Absolute, out _);
-    }
-
-    private static bool BeNonLocal(string? value)
-    {
-        return Uri.TryCreate(value, UriKind.Absolute, out var uri) is false
-            || (uri.IsLoopback is false && uri.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) is false);
     }
 
     private static bool BeACulture(string? value)

@@ -2,8 +2,21 @@ namespace Aurore.Foundation.Telemetry.Models;
 
 public record TelemetryTracingOptions
 {
-    public double TraceIdRatioBasedSampler { get; init; } = 1.0;
-    public string[] IncomingTrafficFilters { get; init; } = [];
-    public string[] OutgoingTrafficFilters { get; init; } = [];
+    /// <summary>
+    /// Fraction of traces kept: 1.0 keeps all of them, 0.1 keeps one in ten.
+    /// </summary>
+    public double SamplingRatio { get; init; } = 1.0;
+
+    /// <summary>
+    /// Path prefixes of incoming requests that are not traced (/health/ is always excluded).
+    /// </summary>
+    public string[] ExcludedIncomingPaths { get; init; } = [];
+
+    /// <summary>
+    /// Path prefixes of outgoing HTTP calls that are not traced (/health/ is always excluded).
+    /// </summary>
+    public string[] ExcludedOutgoingPaths { get; init; } = [];
+
     public bool ExportToConsole { get; init; } = false;
+    public TelemetryBatchExportOptions BatchExport { get; init; } = new();
 }

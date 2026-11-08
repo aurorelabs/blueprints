@@ -1,4 +1,5 @@
 using Aurore.Blueprints.ApiService.Core.Settings;
+using Aurore.Foundation.AspNetCore.MinimalApis;
 using Aurore.Foundation.AspNetCore.OpenApi.Extensions;
 using Aurore.Foundation.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
@@ -10,19 +11,17 @@ namespace Aurore.Blueprints.ApiService.App.Api.Configuration;
 
 internal static class ScalarConfiguration
 {
-    private static readonly int[] _availableVersions = [1, 2];
-
-    internal static IHostApplicationBuilder AddAppScalar(this IHostApplicationBuilder builder, AppSettings appSettings)
+    internal static IHostApplicationBuilder AddAppScalar(this IHostApplicationBuilder builder, AppSettings appSettings, MinimalEndpointCatalog endpoints)
     {
         if (builder.Environment.IsProduction())
             return builder;
 
-        var availableVersions = builder.ConfigureAuroreScalarDocuments(_availableVersions);
+        builder.ConfigureAuroreScalarDocuments(endpoints.Versions);
 
-        foreach (var version in availableVersions)
+        foreach (var version in endpoints.Versions)
         {
             builder.Services
-                .AddOpenApi(version, options => options
+                .AddOpenApi(ScalarExtensions.DocumentName(version.Number), options => options
                     .AddAuroreDocumentInfo(version, appSettings.AppInformation)
                     .AddAuroreJwtBearerSecurity()
                     .AddAuroreApiKeySecurity(appSettings.ApiKeys)
@@ -44,7 +43,8 @@ internal static class ScalarConfiguration
         app.MapScalarApiReference(options => options
             .WithTitle($"{appSettings.AppInformation.Component.ToTitleCase()} API")
             .WithTheme(ScalarTheme.DeepSpace)
-            .WithDefaultHttpClient(ScalarTarget.Shell, ScalarClient.Curl));
+            .WithDefaultHttpClient(ScalarTarget.Shell, ScalarClient.Curl)
+            .WithAuroreAuthentication(appSettings.IdentityProvider, appSettings.ApiDocs));
 
         return app;
     }

@@ -1,23 +1,24 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Asp.Versioning;
+using Aurore.Foundation.AspNetCore.MinimalApis.Abstractions;
 using Aurore.Foundation.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Scalar.AspNetCore;
 
 namespace Aurore.Foundation.AspNetCore.MinimalApis.Configuration;
 
 public static class MinimalApiConfiguration
 {
     /// <summary>
-    /// Problem responses every endpoint can return, documented once for the whole API. 400 is documented separately as
-    /// a validation problem (with the "errors" dictionary).
+    /// Default problem responses every endpoint can return, documented once for the whole API. 400 is documented
+    /// separately as a validation problem (with the "errors" dictionary). Pass your own list to
+    /// <see cref="MapAuroreMinimalEndpoints"/> to replace these.
     /// </summary>
-    public static readonly int[] StandardProblems =
+    public static readonly IReadOnlyList<int> StandardProblems =
     [
         StatusCodes.Status401Unauthorized,
         StatusCodes.Status403Forbidden,
@@ -25,57 +26,75 @@ public static class MinimalApiConfiguration
         StatusCodes.Status500InternalServerError,
     ];
 
-    public static IEndpointRouteBuilder MapAuroreResourcesFromAssembly<TAssembly>(this IEndpointRouteBuilder builder, Action<RouteGroupBuilder>? configure = null)
+    /// <summary>
+    /// Discovers and validates every resource group and endpoint in the assembly of <typeparamref name="TAssembly"/>.
+    /// The returned catalog is the single source of truth for mapping and API documents. Throws when the configuration
+    /// is inconsistent (endpoint targeting an undeclared version, version without endpoints, duplicate group names...).
+    /// </summary>
+    public static IHostApplicationBuilder AddAuroreMinimalEndpoints<TAssembly>(this IHostApplicationBuilder builder, out MinimalEndpointCatalog catalog)
     {
-        var environment = builder.ServiceProvider.GetRequiredService<IHostEnvironment>();
-        var types = typeof(TAssembly).Assembly.GetTypes();
+        catalog = MinimalEndpointCatalog.Create(typeof(TAssembly).Assembly);
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Maps the endpoints of the catalog built by <see cref="AddAuroreMinimalEndpoints{TAssembly}"/>.
+    /// </summary>
+    /// <param name="builder">The route builder (usually the WebApplication).</param>
+    /// <param name="catalog">The catalog returned by AddAuroreMinimalEndpoints.</param>
+    /// <param name="configure">Conventions applied to every endpoint.</param>
+    /// <param name="globalProblems">
+    /// Problem status codes (400-599) documented on every endpoint. Replaces <see cref="StandardProblems"/> when given;
+    /// null keeps the defaults.
+    /// </param>
+    public static IEndpointRouteBuilder MapAuroreMinimalEndpoints(
+        this IEndpointRouteBuilder builder, MinimalEndpointCatalog catalog, Action<RouteGroupBuilder>? configure = null, IEnumerable<int>? globalProblems = null)
+    {
+        var problems = ResolveGlobalProblems(globalProblems);
 
         var api = builder.MapGroup(string.Empty).ProducesValidationProblem();
 
-        foreach (var problem in StandardProblems)
+        foreach (var problem in problems)
             api.ProducesProblem(problem);
 
         configure?.Invoke(api);
 
-        var groups = types
-            .Where(x => x.IsAbstract is false && x.IsSubclassOf(typeof(ResourceGroup)))
-            .Select(CreateInstance<ResourceGroup>)
-            .Where(x => x.IsAvailable(environment));
-
-        foreach (var group in groups)
+        foreach (var (group, endpoints) in catalog.Resources)
         {
             var prefix = group.PrefixWithApi ? "api/v{version:apiVersion}" : "v{version:apiVersion}";
 
             var groupBuilder = api
                 .MapGroup($"{prefix}/{group.Name}")
                 .WithTags([.. group.Tags.Where(x => x.HasValue())])
-                .ConfigureProblems(group)
+                .ConfigureProblems(group, problems)
                 .ConfigureVersionSet(group)
                 .ConfigureAuthorization(group);
 
             group.Configure(groupBuilder);
 
-            groupBuilder.MapEndpoints(types, group);
+            groupBuilder.MapEndpoints(endpoints);
         }
 
         return builder;
     }
 
-    private static T CreateInstance<T>(Type type)
+    internal static IReadOnlyList<int> ResolveGlobalProblems(IEnumerable<int>? globalProblems)
     {
-        try
+        if (globalProblems?.Distinct().ToArray() is not { } custom)
+            return StandardProblems;
+
+        if (custom.Where(x => x is < 400 or > 599).ToArray() is { Length: > 0 } invalid)
         {
-            return (T)Activator.CreateInstance(type)!;
+            throw new ArgumentOutOfRangeException(nameof(globalProblems), $"Problem status codes must be between 400 and 599 (got [{string.Join(", ", invalid)}]).");
         }
-        catch (MissingMethodException ex)
-        {
-            throw new InvalidOperationException($"Failed to create '{type.FullName}'. It needs a public parameterless constructor.", ex);
-        }
+
+        return custom;
     }
 
-    private static RouteGroupBuilder ConfigureProblems(this RouteGroupBuilder builder, ResourceGroup group)
+    private static RouteGroupBuilder ConfigureProblems(this RouteGroupBuilder builder, ResourceGroup group, IReadOnlyList<int> globalProblems)
     {
-        foreach (var problem in group.Problems.Except(StandardProblems))
+        foreach (var problem in group.Problems.Except(globalProblems))
             builder.ProducesProblem(problem);
 
         return builder;
@@ -83,10 +102,18 @@ public static class MinimalApiConfiguration
 
     private static RouteGroupBuilder ConfigureVersionSet(this RouteGroupBuilder builder, ResourceGroup group)
     {
-        var set = builder.NewApiVersionSet().ReportApiVersions();
+        var set = builder.NewApiVersionSet();
 
         foreach (var version in group.Versions)
-            set.HasApiVersion(new ApiVersion(version));
+        {
+            var apiVersion = new ApiVersion(version.Number);
+
+            _ = version switch
+            {
+                { IsDeprecated: true } => set.HasDeprecatedApiVersion(apiVersion),
+                _ => set.HasApiVersion(apiVersion),
+            };
+        }
 
         builder.WithApiVersionSet(set.Build());
 
@@ -98,14 +125,8 @@ public static class MinimalApiConfiguration
         return group.RequireAuthorization ? builder.RequireAuthorization() : builder;
     }
 
-    private static void MapEndpoints(this RouteGroupBuilder builder, Type[] types, ResourceGroup group)
+    private static void MapEndpoints(this RouteGroupBuilder builder, IReadOnlyList<IMinimalEndpoint> endpoints)
     {
-        var groupType = group.GetType();
-
-        var endpoints = types
-            .Where(x => x is { IsClass: true, IsAbstract: false } && GetGroupType(x) == groupType)
-            .Select(CreateInstance<MinimalEndpoint>);
-
         foreach (var endpoint in endpoints)
         {
             var route = endpoint
@@ -114,19 +135,8 @@ public static class MinimalApiConfiguration
                 .WithSummary(endpoint.Summary)
                 .MapToApiVersion(endpoint.Version);
 
-            if (endpoint.Description is not null)
-                route.WithDescription(endpoint.Description);
+            if (endpoint.Description is { } description)
+                route.WithDescription(description);
         }
-    }
-
-    private static Type? GetGroupType(Type type)
-    {
-        for (var current = type.BaseType; current is not null; current = current.BaseType)
-        {
-            if (current is { IsGenericType: true } && current.GetGenericTypeDefinition() == typeof(MinimalEndpoint<>))
-                return current.GetGenericArguments()[0];
-        }
-
-        return null;
     }
 }

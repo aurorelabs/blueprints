@@ -9,4 +9,8 @@
     <PackageTags>aurore core abstractions utilities helpers</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.2.0" />
+  </ItemGroup>
+
 </Project>

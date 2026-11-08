@@ -2,7 +2,6 @@ using Aurore.Blueprints.ApiService.App.Api.Configuration;
 using Aurore.Foundation.AspNetCore.MinimalApis;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Hosting;
 
 namespace Aurore.Blueprints.ApiService.App.Api.Resources.Examples;
 
@@ -14,14 +13,9 @@ internal sealed class ExamplesResource : ResourceGroup
 
     public override string[] Tags => ["Examples"];
 
-    public override int[] Versions => [1, 2];
+    public override MinimalEndpointVersion[] Versions => [1, new(2, true)];
 
     public override int[] Problems => [StatusCodes.Status404NotFound, StatusCodes.Status409Conflict, StatusCodes.Status500InternalServerError];
-
-    public override bool IsAvailable(IHostEnvironment environment)
-    {
-        return environment.IsProduction() is false;
-    }
 
     public override void Configure(RouteGroupBuilder builder)
     {

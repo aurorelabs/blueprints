@@ -13,5 +13,8 @@ public sealed record CorsPolicyOptions
     /// </summary>
     public bool AllowCredentials { get; init; }
 
+    /// <summary>
+    /// How long browsers may cache the preflight answer (Access-Control-Max-Age).
+    /// </summary>
     public int PreflightMaxAgeSeconds { get; init; }
 }

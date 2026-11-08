@@ -35,7 +35,7 @@ public sealed class IdempotencyFilter(HybridCache cache, IdempotencyOptions opti
 
                     return new IdempotencyCacheEntry(statusCode, (result as IValueHttpResult)?.Value);
                 },
-                new HybridCacheEntryOptions { Expiration = TimeSpan.FromMinutes(options.CacheDurationMinutes) },
+                new HybridCacheEntryOptions { Expiration = TimeSpan.FromSeconds(options.CacheDurationSeconds) },
                 cancellationToken: context.HttpContext.RequestAborted);
 
             return entry.Value is null

@@ -91,6 +91,6 @@ public static class HttpDependencyConfiguration
     {
         return dependencies.TryGetValue(name, out var dependency)
             ? dependency
-            : throw new InvalidOperationException($"Dependency '{name}' is not configured in the 'Dependencies' section.");
+            : throw new InvalidOperationException($"Dependency '{name}' is not configured in the 'HttpDependencies' section.");
     }
 }

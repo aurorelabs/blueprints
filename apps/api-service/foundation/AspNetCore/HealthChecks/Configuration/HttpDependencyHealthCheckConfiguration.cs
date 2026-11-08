@@ -28,13 +28,13 @@ public static class HttpDependencyHealthCheckConfiguration
             throw new InvalidOperationException($"Dependency '{checkName}' has an invalid health check TimeoutSeconds '{options.TimeoutSeconds}'. It must be greater than zero.");
 
         var timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-        var failureStatus = options.IsCritical ? HealthStatus.Unhealthy : HealthStatus.Degraded;
+        var failureStatus = options.Critical ? HealthStatus.Unhealthy : HealthStatus.Degraded;
 
         var tags = new[]
             {
                 HealthCheckProperties.Tags.Readiness,
                 HealthCheckProperties.Tags.TypeHttpService,
-                options.IsCritical ? HealthCheckProperties.Tags.Critical : HealthCheckProperties.Tags.NonCritical,
+                options.Critical ? HealthCheckProperties.Tags.Critical : HealthCheckProperties.Tags.NonCritical,
             }
             .Concat(options.Tags.Select(x => x.ToSlugCase()))
             .Distinct(StringComparer.Ordinal);
