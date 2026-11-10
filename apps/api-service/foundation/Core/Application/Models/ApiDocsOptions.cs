@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Core.Application.Models;
 
 /// <summary>
 /// Settings for the interactive API documentation, which only runs outside production.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed record ApiDocsOptions
 {
     /// <summary>

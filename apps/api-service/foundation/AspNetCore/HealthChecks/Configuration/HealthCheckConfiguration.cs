@@ -16,8 +16,12 @@ using Scalar.AspNetCore;
 
 namespace Aurore.Foundation.AspNetCore.HealthChecks.Configuration;
 
+/// <summary>Registers and maps the health check endpoints.</summary>
 public static class HealthCheckConfiguration
 {
+    /// <summary>
+    /// Registers the health checks, including one for every dependency that has a health check configured.
+    /// </summary>
     public static IServiceCollection AddAuroreHealthChecks(
         this IServiceCollection services,
         AppInformationOptions appInfo,

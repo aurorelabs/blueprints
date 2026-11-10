@@ -1,5 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Core.RequestPipeline.Models;
 
+/// <summary>Settings of the security headers.</summary>
+[ExcludeFromCodeCoverage]
 public sealed record SecurityHeadersOptions
 {
     /// <summary>

@@ -1,7 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Aurore.Foundation.Core.RequestPipeline.Models;
 
+/// <summary>Settings of the rate limiter.</summary>
+[ExcludeFromCodeCoverage]
 public sealed record RateLimitingConfigurationOptions
 {
     /// <summary>

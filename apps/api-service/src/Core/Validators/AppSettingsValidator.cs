@@ -3,6 +3,8 @@ using Aurore.Blueprints.ApiService.Core.Settings;
 using Aurore.Foundation.Core.Authentication.Validators;
 using Aurore.Foundation.Core.Extensions;
 using Aurore.Foundation.Core.HttpDependencies.Validators;
+using Aurore.Foundation.Core.Pagination.Validators;
+using Aurore.Foundation.Core.RequestPipeline.Validators;
 using Aurore.Foundation.Telemetry.Validators;
 using FluentValidation;
 using Microsoft.Extensions.Hosting;
@@ -11,7 +13,6 @@ namespace Aurore.Blueprints.ApiService.Core.Validators;
 
 public sealed class AppSettingsValidator : AbstractValidator<AppSettings>
 {
-    // IHostEnvironment instead of bool: the validator scan in AddAppValidators must be able to resolve it.
     public AppSettingsValidator(IHostEnvironment environment)
     {
         var isProduction = environment.IsProduction();
@@ -34,18 +35,13 @@ public sealed class AppSettingsValidator : AbstractValidator<AppSettings>
 
         RuleFor(x => x.IdentityProvider).NotNull().SetValidator(new IdentityProviderOptionsValidator(isProduction));
         RuleFor(x => x.Telemetry).NotNull().SetValidator(new TelemetryOptionsValidator(isProduction));
+        RuleFor(x => x.RequestPipeline).NotNull().SetValidator(new RequestPipelineOptionsValidator());
+        RuleFor(x => x.Pagination).NotNull().SetValidator(new PaginationOptionsValidator());
 
         RuleFor(x => x.HealthChecks.CacheSeconds).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Hosting.ShutdownTimeoutSeconds).GreaterThan(0);
 
-        RuleFor(x => x.ApiKeys.HeaderName).NotEmpty();
-
-        RuleForEach(x => x.ApiKeys.Clients).ChildRules(client =>
-        {
-            client.RuleFor(x => x.Value.Key).NotEmpty().WithMessage("API key client '{PropertyName}' has an empty Key.");
-
-            client.RuleFor(x => x.Value.Key).MinimumLength(32).When(_ => isProduction)
-                .WithMessage("Production API keys must be at least 32 characters. Supply them through environment variables or a secret store.");
-        });
+        RuleFor(x => x.ApiKeys).NotNull().SetValidator(new ApiKeysOptionsValidator(isProduction));
 
         // Reported with the configuration key (HttpDependencies:Orders:BaseUrl), not a positional index.
         RuleFor(x => x.HttpDependencies).Custom((dependencies, context) =>

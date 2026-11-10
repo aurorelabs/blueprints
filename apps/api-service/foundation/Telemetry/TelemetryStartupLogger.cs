@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Aurore.Foundation.Telemetry.Models;
@@ -10,6 +11,7 @@ namespace Aurore.Foundation.Telemetry;
 /// OTLP export failures are silent (the SDK only reports them through its own diagnostics), so the effective settings are
 /// logged once at startup to make a wrong endpoint or protocol easy to spot.
 /// </summary>
+[ExcludeFromCodeCoverage]
 internal sealed class TelemetryStartupLogger(ILogger<TelemetryStartupLogger> logger, TelemetryOptions telemetry) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)

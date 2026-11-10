@@ -10,16 +10,26 @@ public sealed class MinimalEndpointCatalogTests
     [Fact(DisplayName = "Versions are distinct and ascending across groups")]
     public void VersionsAreDistinctAndAscendingAcrossGroups()
     {
-        var catalog = Create(typeof(OrdersGroup), typeof(OrdersV1), typeof(OrdersV2), typeof(BillingGroup), typeof(BillingV2), typeof(BillingV3));
+        // Arrange
+        Type[] types = [typeof(OrdersGroup), typeof(OrdersV1), typeof(OrdersV2), typeof(BillingGroup), typeof(BillingV2), typeof(BillingV3)];
 
+        // Act
+        var catalog = Create(types);
+
+        // Assert
         Assert.Equal([1, 2, 3], catalog.Versions.Select(x => x.Number));
     }
 
     [Fact(DisplayName = "A deprecated version keeps its sunset date")]
     public void DeprecatedVersionKeepsItsSunsetDate()
     {
-        var catalog = Create(typeof(DeprecatingGroup), typeof(DeprecatingV1), typeof(DeprecatingV2));
+        // Arrange
+        Type[] types = [typeof(DeprecatingGroup), typeof(DeprecatingV1), typeof(DeprecatingV2)];
 
+        // Act
+        var catalog = Create(types);
+
+        // Assert
         Assert.Equal(new MinimalEndpointVersion(1), catalog.Versions[0]);
         Assert.Equal(new MinimalEndpointVersion(2, true, new DateOnly(2030, 1, 1)), catalog.Versions[1]);
     }
@@ -27,49 +37,78 @@ public sealed class MinimalEndpointCatalogTests
     [Fact(DisplayName = "Throws when an endpoint targets a version its group does not declare")]
     public void ThrowsWhenEndpointTargetsUndeclaredVersion()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(typeof(UndeclaredGroup), typeof(UndeclaredV1), typeof(UndeclaredV2)));
+        // Arrange
+        Type[] types = [typeof(UndeclaredGroup), typeof(UndeclaredV1), typeof(UndeclaredV2)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("targeting version 2", error.Message);
     }
 
     [Fact(DisplayName = "Throws when a declared version has no endpoint")]
     public void ThrowsWhenDeclaredVersionHasNoEndpoint()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(typeof(NoEndpointGroup), typeof(NoEndpointV1)));
+        // Arrange
+        Type[] types = [typeof(NoEndpointGroup), typeof(NoEndpointV1)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("[2] without any endpoint", error.Message);
     }
 
     [Fact(DisplayName = "Throws when a group declares the same version twice")]
     public void ThrowsWhenVersionsAreDuplicated()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(typeof(DuplicatedGroup), typeof(DuplicatedV1)));
+        // Arrange
+        Type[] types = [typeof(DuplicatedGroup), typeof(DuplicatedV1)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("duplicate versions", error.Message);
     }
 
     [Fact(DisplayName = "Throws when a sunset date is set on a version that is not deprecated")]
     public void ThrowsWhenSunsetIsSetOnAnActiveVersion()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(typeof(SunsetOnActiveGroup), typeof(SunsetOnActiveV1)));
+        // Arrange
+        Type[] types = [typeof(SunsetOnActiveGroup), typeof(SunsetOnActiveV1)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("not deprecated", error.Message);
     }
 
     [Fact(DisplayName = "Throws when two groups share the same name")]
     public void ThrowsWhenGroupNamesAreNotUnique()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(typeof(FirstSameNameGroup), typeof(SecondSameNameGroup)));
+        // Arrange
+        Type[] types = [typeof(FirstSameNameGroup), typeof(SecondSameNameGroup)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("share the name 'same'", error.Message);
     }
 
     [Fact(DisplayName = "Throws when groups disagree on whether a version is deprecated")]
     public void ThrowsWhenGroupsDisagreeOnDeprecation()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(
-            typeof(OrdersGroup), typeof(OrdersV1), typeof(OrdersV2), typeof(DeprecatingGroup), typeof(DeprecatingV1), typeof(DeprecatingV2)));
+        // Arrange
+        Type[] types = [typeof(OrdersGroup), typeof(OrdersV1), typeof(OrdersV2), typeof(DeprecatingGroup), typeof(DeprecatingV1), typeof(DeprecatingV2)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("Version 2", error.Message);
         Assert.Contains("deprecation", error.Message);
     }
@@ -77,9 +116,13 @@ public sealed class MinimalEndpointCatalogTests
     [Fact(DisplayName = "Throws when groups disagree on the sunset date of a version")]
     public void ThrowsWhenGroupsDisagreeOnSunsetDate()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(
-            typeof(DeprecatingGroup), typeof(DeprecatingV1), typeof(DeprecatingV2), typeof(LaterSunsetGroup), typeof(LaterSunsetV2)));
+        // Arrange
+        Type[] types = [typeof(DeprecatingGroup), typeof(DeprecatingV1), typeof(DeprecatingV2), typeof(LaterSunsetGroup), typeof(LaterSunsetV2)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("Version 2", error.Message);
         Assert.Contains("sunset dates", error.Message);
     }
@@ -87,8 +130,13 @@ public sealed class MinimalEndpointCatalogTests
     [Fact(DisplayName = "Throws when two endpoints share the same route name")]
     public void ThrowsWhenRouteNamesAreNotUnique()
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Create(typeof(SameRouteNameGroup), typeof(SameRouteNameFirst), typeof(SameRouteNameSecond)));
+        // Arrange
+        Type[] types = [typeof(SameRouteNameGroup), typeof(SameRouteNameFirst), typeof(SameRouteNameSecond)];
 
+        // Act
+        var error = Assert.Throws<InvalidOperationException>(() => Create(types));
+
+        // Assert
         Assert.Contains("share the route name 'same-route'", error.Message);
     }
 

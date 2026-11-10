@@ -5,8 +5,13 @@ using Microsoft.AspNetCore.Http;
 
 namespace Aurore.Foundation.AspNetCore.RequestPipeline.Middlewares;
 
+/// <summary>
+/// Adds the security headers to every response: no content sniffing, no framing, no referrer, and the content security
+/// policy when one is configured.
+/// </summary>
 public sealed class SecurityHeadersMiddleware(RequestDelegate next, SecurityHeadersOptions options)
 {
+    /// <summary>Adds the headers when the response starts.</summary>
     public Task InvokeAsync(HttpContext context)
     {
         context.Response.OnStarting(() =>

@@ -12,11 +12,13 @@ namespace Aurore.Foundation.AspNetCore.MinimalApis;
 /// <param name="Description">What this version is about; shown in the API document. Shared by every group declaring the version.</param>
 public readonly record struct MinimalEndpointVersion(int Number, bool IsDeprecated = false, DateOnly? Sunset = null, string? Description = null)
 {
+    /// <summary>Lets a plain number stand for a version without extra details.</summary>
     public static implicit operator MinimalEndpointVersion(int number)
     {
         return new MinimalEndpointVersion(number);
     }
 
+    /// <summary>The version in the form used in URLs, such as v1.</summary>
     public override string ToString()
     {
         return IsDeprecated ? $"{Number} (deprecated)" : $"{Number}";

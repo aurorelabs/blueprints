@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace Aurore.Foundation.AspNetCore.RequestPipeline.Configuration;
 
+/// <summary>Registers CORS policies.</summary>
 public static class CorsConfiguration
 {
     private const string DefaultPolicyName = "default";
@@ -31,32 +33,18 @@ public static class CorsConfiguration
         HeaderNames.TraceParent,
     ];
 
-    private static IServiceCollection AddAllowAllCorsPolicy(this IServiceCollection services)
+    /// <summary>
+    /// CORS is optional: without policies nothing is registered and browsers are limited to same-origin calls.
+    /// Configure policies only when a browser app calls this service directly from another origin.
+    /// </summary>
+    internal static IHostApplicationBuilder AddAuroreCorsPolicies(this IHostApplicationBuilder builder, IReadOnlyDictionary<string, CorsPolicyOptions> policies)
     {
-        return services
-            .AddCors(options => options
-                .AddDefaultPolicy(builder => builder
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .AllowAnyOrigin()
-                    .WithExposedHeaders(_defaultExposedHeaders)));
-    }
-
-    public static IHostApplicationBuilder AddAuroreCorsPolicies(this IHostApplicationBuilder builder, IReadOnlyDictionary<string, CorsPolicyOptions> policies)
-    {
-        var isProduction = builder.Environment.IsProduction();
-
         if (policies.Count == 0)
         {
-            if (isProduction)
-                throw new InvalidOperationException("No CORS policies are configured. Production requires at least one explicit CORS policy in the 'RequestPipeline:CorsPolicies' configuration section.");
-
-            builder.Services.AddAllowAllCorsPolicy();
-
             return builder;
         }
 
-        ValidatePolicies(policies, isProduction);
+        ValidatePolicies(policies, builder.Environment.IsProduction());
 
         builder.Services.AddCors(options =>
         {
@@ -70,6 +58,14 @@ public static class CorsConfiguration
         });
 
         return builder;
+    }
+
+    /// <summary>
+    /// Pairs with AddAuroreCorsPolicies: UseCors() fails at startup when CORS services were never registered.
+    /// </summary>
+    internal static IApplicationBuilder UseAuroreCors(this IApplicationBuilder builder, IReadOnlyDictionary<string, CorsPolicyOptions> policies)
+    {
+        return policies.Count > 0 ? builder.UseCors() : builder;
     }
 
     private static void ValidatePolicies(IReadOnlyDictionary<string, CorsPolicyOptions> policies, bool isProduction)

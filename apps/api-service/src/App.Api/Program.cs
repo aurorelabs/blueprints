@@ -11,6 +11,7 @@ using Aurore.Foundation.Core.Application;
 using Aurore.Foundation.Core.Application.Constants;
 using Aurore.Foundation.Telemetry.Configuration;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -23,49 +24,33 @@ try
     builder
         .ConfigureAuroreSerializers()
         .LoadAppSettings(out var appSettings)
+        .ConfigureAuroreHosting(appSettings.Hosting)
         .AddAuroreTelemetry(appSettings.AppInformation, appSettings.Telemetry)
         .AddAuroreMinimalEndpoints<Program>(out var endpoints)
         .AddAppScalar(appSettings, endpoints)
-        .AddAuroreCorsPolicies(appSettings.RequestPipeline.CorsPolicies);
+        .AddAuroreRequestPipeline(appSettings.RequestPipeline);
 
     AppDiagnostics.Initialize(appSettings.AppInformation.ActivitySource);
 
-    var pipeline = appSettings.RequestPipeline;
-
     builder.Services
-        .ConfigureAuroreKestrelLimits(pipeline.KestrelLimits)
-        .ConfigureAuroreForwardedHeaders(pipeline.ForwardedHeaders)
-        .AddAuroreRequestContext()
+        .AddSingleton(TimeProvider.System)
+        .AddSingleton(appSettings.Pagination)
         .AddAuroreApiVersioning(endpoints)
-        .AddAuroreResponseCompression(pipeline.ResponseCompression)
         .AddAuroreAuthConfiguration(appSettings.IdentityProvider, appSettings.ApiKeys)
         .AddAuroreHealthChecks(appSettings.AppInformation, appSettings.HealthChecks, appSettings.HttpDependencies)
-        .AddAuroreRequestTimeouts(pipeline.Timeouts)
-        .AddAuroreRateLimiting(pipeline.RateLimiting)
-        .AddAuroreIdempotency(pipeline.Idempotency)
-        .AddAuroreExceptionHandler()
         .AddAppValidators(appSettings)
         .AddAppFeatures(appSettings)
         .AddAppInfra(appSettings);
 
     app = builder.Build();
 
-    app.UseAppScalar(appSettings);
-
     app
-        .UseForwardedHeaders()
-        .UseExceptionHandler()
-        .UseAuroreSecurityHeaders(pipeline.SecurityHeaders)
-        .UseAuroreRequestContext()
-        .UseHttpsRedirection()
-        .UseAuroreResponseCompression(pipeline.ResponseCompression)
-        .UseCors()
-        .UseAuroreMaintenanceMode(pipeline.MaintenanceMode)
+        .UseAuroreRequestPipeline(appSettings.RequestPipeline)
         .UseAuthentication()
         .UseAuthorization()
-        .UseRateLimiter()
-        .UseRequestTimeouts()
-        .UseOutputCache();
+        .UseAuroreEndpointPolicies();
+
+    app.MapAppScalar(appSettings);
 
     app.MapAuroreHealthChecks(appSettings.AppInformation);
 

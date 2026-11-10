@@ -10,8 +10,13 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Aurore.Foundation.AspNetCore.HealthChecks.Configuration;
 
+/// <summary>Registers the health check of an upstream HTTP service.</summary>
 public static class HttpDependencyHealthCheckConfiguration
 {
+    /// <summary>
+    /// Adds a check that calls the dependency's readiness endpoint. Critical dependencies make the service unhealthy when
+    /// they fail, others only degraded.
+    /// </summary>
     public static IHealthChecksBuilder AddAuroreHttpDependencyCheck(
         this IHealthChecksBuilder builder,
         AppInformationOptions appInfo,

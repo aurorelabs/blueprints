@@ -5,12 +5,16 @@ using System.Linq;
 
 namespace Aurore.Foundation.Core.Extensions;
 
+/// <summary>File path helpers.</summary>
 public static class PathExtensions
 {
     private const string WslPrefix = "/mnt/";
 
     extension(Path)
     {
+        /// <summary>
+        /// Combines path segments into a full path, translating Windows drive paths when running under WSL.
+        /// </summary>
         public static string NormalizeRuntimePath(params string[] paths)
         {
             var normalized = paths

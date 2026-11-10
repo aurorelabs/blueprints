@@ -1,5 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Telemetry.Models;
 
+/// <summary>Settings of trace export.</summary>
+[ExcludeFromCodeCoverage]
 public record TelemetryTracingOptions
 {
     /// <summary>
@@ -17,6 +21,8 @@ public record TelemetryTracingOptions
     /// </summary>
     public string[] ExcludedOutgoingPaths { get; init; } = [];
 
+    /// <summary>Also write the spans to the console, which helps when no collector is running.</summary>
     public bool ExportToConsole { get; init; } = false;
+    /// <summary>How spans are batched before export.</summary>
     public TelemetryBatchExportOptions BatchExport { get; init; } = new();
 }

@@ -3,6 +3,7 @@ using Aurore.Foundation.Core.Extensions;
 
 namespace Aurore.Foundation.Core.Application;
 
+/// <summary>The running application's version.</summary>
 public static class AppVersion
 {
     /// <summary>

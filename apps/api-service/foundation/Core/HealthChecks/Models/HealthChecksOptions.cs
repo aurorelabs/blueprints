@@ -1,7 +1,10 @@
 using Aurore.Foundation.Core.HealthChecks.Constants;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Aurore.Foundation.Core.HealthChecks.Models;
 
+/// <summary>Settings of the health check endpoints.</summary>
+[ExcludeFromCodeCoverage]
 public sealed record HealthChecksOptions
 {
     /// <summary>

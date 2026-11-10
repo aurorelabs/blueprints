@@ -1,5 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Core.RequestPipeline.Models;
 
+/// <summary>Settings of the idempotency filter.</summary>
+[ExcludeFromCodeCoverage]
 public sealed record IdempotencyOptions
 {
     /// <summary>

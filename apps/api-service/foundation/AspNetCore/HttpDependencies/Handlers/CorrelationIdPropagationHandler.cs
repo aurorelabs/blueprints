@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Aurore.Foundation.AspNetCore.HttpDependencies.Handlers;
 
+/// <summary>Forwards the current request's correlation id to the upstream service.</summary>
 public sealed class CorrelationIdPropagationHandler(IHttpContextAccessor httpContextAccessor) : DelegatingHandler
 {
     /// <summary>

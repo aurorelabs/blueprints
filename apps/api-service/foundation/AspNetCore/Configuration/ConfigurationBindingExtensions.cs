@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Aurore.Foundation.AspNetCore.Configuration;
 
+/// <summary>Binding of configuration sections to settings classes.</summary>
 public static class ConfigurationBindingExtensions
 {
     /// <summary>

@@ -2,6 +2,7 @@ using System;
 
 namespace Aurore.Foundation.Core.Extensions;
 
+/// <summary>Helpers for turning text into enum values.</summary>
 public static class EnumExtensions
 {
     /// <summary>
@@ -18,6 +19,7 @@ public static class EnumExtensions
             $"'{value}' is not a valid {typeof(TEnum).Name} value. Expected one of: {string.Join(", ", Enum.GetNames<TEnum>())}.");
     }
 
+    /// <summary>Case-insensitive parse that returns the fallback for unknown values instead of throwing.</summary>
     public static TEnum ParseEnumOrDefault<TEnum>(this string? value, TEnum fallback)
         where TEnum : struct, Enum
     {

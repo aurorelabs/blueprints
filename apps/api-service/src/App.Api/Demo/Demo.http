@@ -1,0 +1,127 @@
+# Reference examples for resource conventions and authorization. Run the app with the Development profile.
+@baseUrl = https://localhost:5001
+
+# Paste an access token from Keycloak (e.g. Scalar's OAuth2 flow, or a client-credentials request).
+@token = paste-a-token-here
+
+### Layering: check X-Level-App/Group/Endpoint (all "true") and X-Configured-By ("endpoint")
+GET {{baseUrl}}/v1/demo/layers/headers
+
+### Versioning: same route, version 2
+GET {{baseUrl}}/v2/demo/layers/headers
+
+### Authenticated: 401 without a token
+GET {{baseUrl}}/v1/demo/auth/authenticated
+
+### Authenticated: with a token, lists your claims (handy to see how Keycloak sends roles and scopes)
+GET {{baseUrl}}/v1/demo/auth/authenticated
+Authorization: Bearer {{token}}
+
+### Scope "api.read": 403 if the token lacks it
+GET {{baseUrl}}/v1/demo/auth/scope
+Authorization: Bearer {{token}}
+
+### Role "admin" (Keycloak realm or client role, or a plain role claim, depending on IdentityProvider:Provider): 403 without it
+GET {{baseUrl}}/v1/demo/auth/role
+Authorization: Bearer {{token}}
+
+### Combined: needs scope "api.write" AND role "admin"
+GET {{baseUrl}}/v1/demo/auth/combined
+Authorization: Bearer {{token}}
+
+### API key: local key from appsettings.json works on "either" (scope api.read comes from the key's settings)
+GET {{baseUrl}}/v1/demo/auth/either
+X-Api-Key: local-dev-api-key
+
+### Bearer token works on "either" too (needs scope api.read)
+GET {{baseUrl}}/v1/demo/auth/either
+Authorization: Bearer {{token}}
+
+### Wrong API key -> 401
+GET {{baseUrl}}/v1/demo/auth/either
+X-Api-Key: wrong-key
+
+### API key only: API key with role "reader" -> 200
+GET {{baseUrl}}/v1/demo/auth/api-key-only
+X-Api-Key: local-dev-api-key
+
+### API key only: a bearer token alone -> 401
+GET {{baseUrl}}/v1/demo/auth/api-key-only
+Authorization: Bearer {{token}}
+
+### Bearer only: an API key alone -> 401
+GET {{baseUrl}}/v1/demo/auth/bearer-only
+X-Api-Key: local-dev-api-key
+
+### ---- Diagnostics, dependencies and policies ----
+
+### Health: live -> 200 with name and version
+GET {{baseUrl}}/health/live
+
+### Health: ready -> 200, status only (no dependency names)
+GET {{baseUrl}}/health/ready
+
+### Health: status without a token -> 401
+GET {{baseUrl}}/health/status
+
+### Correlation: the response echoes this id
+GET {{baseUrl}}/v1/demo/diagnostics/correlation
+Correlation-Id: my-test-correlation-id
+
+### Correlation: invalid id (space and "!") -> a new one is generated
+GET {{baseUrl}}/v1/demo/diagnostics/correlation
+Correlation-Id: not valid!
+
+### Typed client (IGitHubClient on the GitHub dependency): 200 with the user, 404 for an unknown one
+GET {{baseUrl}}/v1/demo/dependencies/github/octocat
+
+### Named client from IHttpClientFactory (RandomUser): forwards Correlation-Id
+GET {{baseUrl}}/v1/demo/dependencies/random-user
+Correlation-Id: forwarded-to-random-user
+
+### Rate limiting: send 4 times within 10 seconds; the 4th returns 429 with Retry-After
+GET {{baseUrl}}/v1/demo/rate-limiting/limited
+
+### Timeout: 1 second -> 200
+GET {{baseUrl}}/v1/demo/timeouts/1
+
+### Timeout: 5 seconds -> 504 after ~2 seconds (not enforced while debugging)
+GET {{baseUrl}}/v1/demo/timeouts/5
+
+### Idempotency: send twice -> same id both times
+POST {{baseUrl}}/v1/demo/idempotency/orders
+Idempotency-Key: test-key-0001
+
+### Idempotency: different key -> different id
+POST {{baseUrl}}/v1/demo/idempotency/orders
+Idempotency-Key: test-key-0002
+
+### Errors: 500 ProblemDetails, no stack trace in the body
+GET {{baseUrl}}/v1/demo/diagnostics/error
+
+### Authorization: 401 without a token
+GET {{baseUrl}}/v1/demo/diagnostics/authorized
+
+### Security headers: check X-Content-Type-Options, X-Frame-Options and Referrer-Policy on the response
+GET {{baseUrl}}/health/live
+
+### Output cache (policy "short", 10 seconds): the timestamp stays the same for 10 seconds
+GET {{baseUrl}}/v1/demo/caching/timestamp
+
+### Unknown route -> 404 with a problem body
+GET {{baseUrl}}/v1/nothing-here
+
+### Pagination: second page of 5, ordered by name descending then id
+GET {{baseUrl}}/v1/demo/pagination/people?page=2&pageSize=5&orderBy=name:desc&orderBy=id
+
+### Pagination: created range (from inclusive, to exclusive) and a name filter
+GET {{baseUrl}}/v1/demo/pagination/people?createdFrom=2026-02-10T00:00:00Z&createdTo=2026-02-13T00:00:00Z&name=person
+
+### Pagination: 400 for a page size over the maximum, an unknown order field, and a backwards range (all reported together)
+GET {{baseUrl}}/v1/demo/pagination/people?pageSize=1000&orderBy=secret&createdFrom=2026-02-01T00:00:00Z&createdTo=2026-01-01T00:00:00Z
+
+### Cursor pagination: first page; copy nextCursor from the response into the next call (same filters and ordering)
+GET {{baseUrl}}/v1/demo/pagination/people/stream?pageSize=10&orderBy=name:desc
+
+### Cursor pagination: next page (paste the cursor); a cursor with other filters returns 400 pagination.cursor_mismatch
+GET {{baseUrl}}/v1/demo/pagination/people/stream?pageSize=10&orderBy=name:desc&cursor=PASTE_NEXT_CURSOR_HERE

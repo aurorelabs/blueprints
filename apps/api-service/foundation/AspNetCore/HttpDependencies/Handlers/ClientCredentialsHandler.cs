@@ -10,6 +10,7 @@ namespace Aurore.Foundation.AspNetCore.HttpDependencies.Handlers;
 /// <summary>Adds a cached OAuth2 client-credentials access token as <c>Authorization: Bearer</c>.</summary>
 public sealed class ClientCredentialsHandler(ClientCredentialsTokenCache tokens, string dependency, ClientCredentialsOptions options) : DelegatingHandler
 {
+    /// <summary>Adds a valid access token before sending the request.</summary>
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var token = await tokens.GetTokenAsync(dependency, options, cancellationToken);

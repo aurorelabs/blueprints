@@ -1,7 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Aurore.Foundation.Core.RequestPipeline.Models;
 
+/// <summary>Settings of the request timeouts.</summary>
+[ExcludeFromCodeCoverage]
 public sealed record RequestTimeoutsConfigurationOptions
 {
     /// <summary>

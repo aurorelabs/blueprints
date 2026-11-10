@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\AspNetCore\AspNetCore.csproj" />
+    <ProjectReference Include="..\Tests.Shared\Tests.Shared.csproj" />
   </ItemGroup>
 
 </Project>

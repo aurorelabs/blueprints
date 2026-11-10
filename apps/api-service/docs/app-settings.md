@@ -1,91 +1,58 @@
 # Application settings
 
-`appsettings.json` is the contract between the service and whoever deploys it. It is bound once at startup into a single
-`AppSettings` object, validated, and passed to the `Add*`/`Use*` methods that need a piece of it.
-
-## How loading works
+`appsettings.json` is bound once at startup into `AppSettings`, validated, and passed as parameters to the `Add*`/`Use*`
+methods that need it.
 
 ```csharp
-builder
-    .ConfigureAuroreSerializers()
-    .LoadAppSettings(out var appSettings)      // bind + validate, or the app does not start
-    .AddAuroreTelemetry(appSettings.AppInformation, appSettings.Telemetry);
+builder.LoadAppSettings(out var appSettings);   // bind + validate, or the app does not start
 ```
 
-- **Strict binding.** `GetStrict<T>()` (`foundation/AspNetCore/Configuration/ConfigurationBindingExtensions.cs`) fails on
-  keys that do not map to a property. A typo (`Telemtry:Otlp:Endpoint`) is a startup error instead of a silent default.
-  `Logging` and framework keys such as `AllowedHosts` are read by the framework, not by `AppSettings`.
-- **Validation.** `AppSettingsValidator` (`src/Core`) composes FluentValidation validators from the foundation packages
-  (`IdentityProviderOptionsValidator`, `TelemetryOptionsValidator`, `HttpDependencyOptionsValidator`) and adds app rules.
-  Errors carry the configuration key path (`Telemetry:Otlp:Endpoint`), so the message tells you what to edit.
-- **No DI registration.** `AppSettings` is deliberately *not* in the container. Configuration flows through method
-  parameters, which keeps it away from code that has no business reading it.
-- **Failure = exit code 78.** Any exception while building the app returns `ExitCodes.ConfigurationError` (sysexits
-  `EX_CONFIG`). Runtime failures return 70. Orchestrators can tell "bad config, do not restart-loop" from "crashed".
+- **Strict binding**: an unknown key is an error, so a typo cannot silently fall back to a default.
+- **Validation**: `AppSettingsValidator` composes the FluentValidation validators of the foundation packages. Errors name the
+  config key (`Telemetry:Otlp:Endpoint`).
+- **Not in DI**: pass the section you need as a parameter; do not inject `AppSettings`.
+- **Exit codes**: invalid configuration exits with 78, a runtime crash with 70.
 
 ## Conventions
 
-- **Time is always in seconds.** The name says so: `CacheSeconds`, `TimeoutSeconds`, `RetryAfterSeconds`. Milliseconds exist
-  only at the OpenTelemetry SDK boundary (`ToMilliseconds` in `TelemetryConfiguration`).
-- **Booleans**: `Enabled` for switches, `Critical` for "failure makes the app unhealthy".
-- **Sizes carry the unit**: `MaxRequestBodySizeBytes`.
-- **One level of grouping where it is cohesive.** `RequestPipeline` groups the HTTP-pipeline concerns, `Telemetry:Otlp`
-  groups the exporter. Nest when the children share a lifecycle or are read together; keep flat when they are
-  independent. Nesting is a judgment call, neither forbidden nor a goal. Remember each level adds a `__` to the
-  environment-variable name.
+- Time is in **seconds** and the name says so: `CacheSeconds`, `TimeoutSeconds`, `RetryAfterSeconds`.
+- Switches are `Enabled`; health criticality is `Critical`; sizes carry the unit (`MaxRequestBodySizeBytes`).
+- Group (one level) when the children belong together, like `RequestPipeline` or `Telemetry:Otlp`. Otherwise keep flat.
 
-## Layout
+## Sections
 
 | Section | Purpose |
 | --- | --- |
-| `AllowedHosts` | Framework host filtering. `*` in development; set it in production if the app is reachable directly. |
-| `AppInformation` | Domain/Boundary/Component, description, maintainer (name, email, optional URL), locale. Feeds telemetry resource attributes and the API documents. |
-| `ApiDocs` | `OAuthClientId`: the public client the docs UI uses to log in. |
-| `ApiKeys` | Header name and the clients allowed to use API-key auth, with roles and scopes. |
-| `HealthChecks` | `CacheSeconds`: how long a health result is reused. |
-| `HttpDependencies` | One entry per upstream service: base URL, headers, upstream auth (API key or client credentials), health check. |
-| `IdentityProvider` | OIDC authority, audience, scopes, `RequireHttpsMetadata`. |
-| `Logging` | Standard `Logging:LogLevel`, read by the framework. |
-| `RequestPipeline` | CORS, forwarded headers, idempotency, Kestrel limits, maintenance mode, rate limiting, compression, security headers, timeouts. |
-| `Telemetry` | OTLP exporter, resource attributes, logging/metrics/tracing tunables. See [telemetry](./telemetry.md). |
+| `AllowedHosts` | Framework host filtering. |
+| `AppInformation` | Name, maintainer, locale. Used by telemetry and the API docs. |
+| `ApiDocs` | `OAuthClientId` for the docs login. |
+| `ApiKeys` | Header name and API-key clients. |
+| `HealthChecks` | `CacheSeconds`. |
+| `HttpDependencies` | Upstream services: URL, headers, auth, health check. |
+| `IdentityProvider` | OIDC authority, audience, scopes. |
+| `Logging` | Framework log levels. |
+| `RequestPipeline` | CORS, forwarded headers, idempotency, Kestrel limits, rate limiting, compression, security headers, timeouts. |
+| `Telemetry` | See [telemetry](./telemetry.md). |
 
 ## Environments
 
-`appsettings.json` holds **development-friendly defaults** (localhost URLs, dev secrets). `appsettings.Production.json`
-overrides only what must differ and documents, in comments, what production *must* provide.
+`appsettings.json` has development defaults. `appsettings.Production.json` overrides what must differ. In Production the app
+refuses to start if a development value is still in effect (local URLs, plain HTTP, short API keys, localhost CORS origins).
 
-In Production the validators refuse to start the app while a development default is in effect: local URLs for the
-identity provider, telemetry collector, CORS origins and upstream dependencies; plain HTTP; API keys shorter than 32
-characters. Upstream secrets (`ClientSecret`, `ApiKey:Value`) are only checked for being non-empty, because a placeholder
-secret cannot be told apart from a real one.
-
-### Overriding with environment variables
-
-Nested keys use a double underscore:
+Environment variables use `__` for nesting:
 
 ```
 Telemetry__Otlp__Endpoint=http://otel-collector:4317
-RequestPipeline__MaintenanceMode__Enabled=true
 RequestPipeline__CorsPolicies__Default__AllowedOrigins__0=https://app.example.com
 ```
 
-Arrays are overridden by index and merged with lower layers: an empty array in an override does **not** clear the values
-from `appsettings.json`. That is why production origins must be provided rather than "emptied".
+Array overrides merge by index; an empty array does not clear lower layers. Do not commit real secrets: use environment
+variables or an encrypted file (SOPS + age).
 
-### Secrets
+## Add a setting
 
-Do not put real secrets in `appsettings*.json`. Supply them through environment variables or an encrypted file
-(SOPS + age) decrypted at deploy time.
-
-## How-to: add a setting
-
-1. Add the property to the options record (`foundation/Core/...`, or `src/Core` for app-only settings) with a sensible default.
-2. Add the key to `appsettings.json` with a development-safe value.
-3. Add a rule to the options validator (`> 0` for durations, absolute URL for URLs, and so on).
-4. Use it where needed, passing it as a parameter. Do not inject `AppSettings`.
-5. Run the tests: `AppSettingsFileTests` loads the real `appsettings.json` strictly and checks that Production refuses dev defaults.
-
-## How-to: add a setting group
-
-Create the options record, add it as a property of `AppSettings`, compose its validator in `AppSettingsValidator` using
-`Custom` so errors keep the full key path, and add the section to `appsettings.json`.
+1. Add the property (with a default) to the options record.
+2. Add the key to `appsettings.json`.
+3. Add a rule to the validator.
+4. Pass it as a parameter where it is used.
+5. Run the tests: `AppSettingsFileTests` loads the real file strictly.

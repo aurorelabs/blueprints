@@ -3,8 +3,10 @@ using FluentValidation;
 
 namespace Aurore.Foundation.Telemetry.Validators;
 
+/// <summary>Checks the telemetry settings at startup.</summary>
 public sealed class TelemetryOptionsValidator : AbstractValidator<TelemetryOptions>
 {
+    /// <summary>Creates the validator. The flag turns on the stricter production rules.</summary>
     public TelemetryOptionsValidator(bool isProduction)
     {
         RuleFor(x => x.Otlp).SetValidator(new TelemetryOtlpOptionsValidator(isProduction));

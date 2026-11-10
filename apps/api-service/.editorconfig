@@ -127,6 +127,7 @@ dotnet_diagnostic.IDE0065.severity = error  # using placement
 dotnet_diagnostic.IDE0022.severity = error  # expression-bodied methods
 dotnet_diagnostic.IDE0021.severity = error  # expression-bodied constructors
 dotnet_diagnostic.IDE0011.severity = error  # braces
+dotnet_diagnostic.CA2016.severity = error  # forward the CancellationToken
 dotnet_diagnostic.IDE0007.severity = error  # use var
 dotnet_diagnostic.IDE0037.severity = error  # inferred member names
 dotnet_diagnostic.IDE0032.severity = error  # auto properties
@@ -142,6 +143,13 @@ dotnet_diagnostic.IDE0003.severity = error  # no this.
 dotnet_diagnostic.IDE0051.severity = error  # unused private members
 dotnet_diagnostic.IDE0052.severity = error  # unread private members
 
-# XML docs not required: this is an application, not a package; the OpenAPI spec is the documentation.
-# (In NuGet package repos, set this to error.)
+# XML docs: not required in the application (the OpenAPI spec is the documentation); required in foundation/ (see the end of this file).
+
+dotnet_diagnostic.CS1591.severity = none
+
+# The foundation is the reusable layer: public API must be documented. Tests are exempt.
+[foundation/**.cs]
+dotnet_diagnostic.CS1591.severity = error
+
+[foundation/tests/**.cs]
 dotnet_diagnostic.CS1591.severity = none

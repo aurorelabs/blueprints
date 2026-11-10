@@ -27,7 +27,7 @@ dotnet test --project tests/Tests/Tests.csproj
 dotnet test --project tests/Tests.Integration/Tests.Integration.csproj
 ```
 
-Filter by feature with `--filter-trait "Feature=Maintenance mode"`.
+Filter by feature with `--filter-trait "Feature=Idempotency"`.
 
 ## Project documentation
 

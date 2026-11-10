@@ -4,8 +4,9 @@ using System.Linq;
 using Aurore.Foundation.Core.Application.Models;
 using Aurore.Foundation.Core.Constants;
 using Aurore.Foundation.Core.Extensions;
-using Aurore.Foundation.Telemetry.Constants;
+using Aurore.Foundation.Core.Privacy;
 using Aurore.Foundation.Telemetry.Models;
+using Aurore.Foundation.Telemetry.Processors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ using OpenTelemetry.Trace;
 
 namespace Aurore.Foundation.Telemetry.Configuration;
 
+/// <summary>Registers OpenTelemetry for the application: logs, metrics and traces exported over OTLP.</summary>
 public static class TelemetryConfiguration
 {
     private const string PostgresSourceName = "Npgsql";
@@ -149,6 +151,8 @@ public static class TelemetryConfiguration
                     .AddIncomingTrafficInstrumentation(telemetry.Tracing.ExcludedIncomingPaths)
                     .AddOutgoingTrafficInstrumentation(telemetry.Tracing.ExcludedOutgoingPaths)
                     .SetErrorStatusOnException()
+                    // Must come before the exporters: it encrypts personal data in tags before they are exported.
+                    .AddProcessor(provider => new PrivacyActivityProcessor(provider.GetService<IPrivacyProtector>() ?? new PrivacyProtector(new())))
                     .AddOtlpExporter(exporter =>
                     {
                         ConfigureOtlpExporter(telemetry, OtlpTraceSignal)(exporter);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Asp.Versioning;
 using Aurore.Foundation.AspNetCore.MinimalApis.Abstractions;
+using Aurore.Foundation.AspNetCore.RequestPipeline.Filters;
 using Aurore.Foundation.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Aurore.Foundation.AspNetCore.MinimalApis.Configuration;
 
+/// <summary>Discovers the resource groups and endpoints of the application and maps them.</summary>
 public static class MinimalApiConfiguration
 {
     /// <summary>
@@ -53,7 +55,10 @@ public static class MinimalApiConfiguration
     {
         var problems = ResolveGlobalProblems(globalProblems);
 
-        var api = builder.MapGroup(string.Empty).ProducesValidationProblem();
+        var api = builder
+            .MapGroup(string.Empty)
+            .ProducesValidationProblem()
+            .AddEndpointFilterFactory(RequestValidationFilter.Create);
 
         foreach (var problem in problems)
             api.ProducesProblem(problem);

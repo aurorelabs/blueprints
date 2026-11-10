@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Aurore.Foundation.Core.Authentication.Models;
 
@@ -7,9 +8,11 @@ namespace Aurore.Foundation.Core.Authentication.Models;
 /// Keys are secrets: keep only local values in appsettings.json and supply real ones through environment variables or a
 /// secret store (e.g. ApiKeys__Clients__billing-service__Key).
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed record ApiKeysOptions
 {
-    public string HeaderName { get; init; } = "AL-Api-Key";
+    /// <summary>The request header that carries the key.</summary>
+    public string HeaderName { get; init; } = "X-Api-Key";
 
     /// <summary>
     /// Client name -&gt; settings. The client name becomes the caller's identity (name and NameIdentifier claims).

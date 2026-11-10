@@ -8,9 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Aurore.Foundation.AspNetCore.RequestPipeline.Configuration;
 
+/// <summary>Registers response compression.</summary>
 public static class CompressionConfiguration
 {
-    public static IServiceCollection AddAuroreResponseCompression(this IServiceCollection services, ResponseCompressionConfigurationOptions options)
+    internal static IServiceCollection AddAuroreResponseCompression(this IServiceCollection services, ResponseCompressionConfigurationOptions options)
     {
         if (options.Enabled is false)
             return services;
@@ -33,7 +34,7 @@ public static class CompressionConfiguration
     /// Pairs with AddAuroreResponseCompression: when compression is disabled its services aren't registered,
     /// and the framework's UseResponseCompression() would fail to start.
     /// </summary>
-    public static IApplicationBuilder UseAuroreResponseCompression(this IApplicationBuilder builder, ResponseCompressionConfigurationOptions options)
+    internal static IApplicationBuilder UseAuroreResponseCompression(this IApplicationBuilder builder, ResponseCompressionConfigurationOptions options)
     {
         return options.Enabled ? builder.UseResponseCompression() : builder;
     }

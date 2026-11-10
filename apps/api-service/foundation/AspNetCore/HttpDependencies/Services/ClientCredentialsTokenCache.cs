@@ -25,6 +25,9 @@ public sealed class ClientCredentialsTokenCache(IHttpClientFactory clientFactory
     private readonly ConcurrentDictionary<string, CachedToken> _tokens = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
+    /// <summary>
+    /// Returns the cached access token for the key, requesting a new one when there is none or it is about to expire.
+    /// </summary>
     public async ValueTask<string> GetTokenAsync(string key, ClientCredentialsOptions options, CancellationToken cancellationToken)
     {
         if (TryGetValid(key, out var token))

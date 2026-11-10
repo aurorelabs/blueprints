@@ -8,14 +8,24 @@ public sealed class GlobalProblemsTests
     [Fact(DisplayName = "Standard problems are used when no global problems are given")]
     public void UsesStandardProblemsByDefault()
     {
-        Assert.Same(MinimalApiConfiguration.StandardProblems, MinimalApiConfiguration.ResolveGlobalProblems(null));
+        // Arrange
+        // Act
+        var problems = MinimalApiConfiguration.ResolveGlobalProblems(null);
+
+        // Assert
+        Assert.Same(MinimalApiConfiguration.StandardProblems, problems);
     }
 
     [Fact(DisplayName = "A custom list replaces the standard problems and drops duplicates")]
     public void CustomListReplacesTheStandardProblems()
     {
-        var problems = MinimalApiConfiguration.ResolveGlobalProblems([401, 500, 500]);
+        // Arrange
+        int[] custom = [401, 500, 500];
 
+        // Act
+        var problems = MinimalApiConfiguration.ResolveGlobalProblems(custom);
+
+        // Assert
         Assert.Equal([401, 500], problems);
     }
 
@@ -25,6 +35,13 @@ public sealed class GlobalProblemsTests
     [InlineData(600)]
     public void ThrowsWhenStatusCodeIsNotAnError(int status)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => MinimalApiConfiguration.ResolveGlobalProblems([401, status]));
+        // Arrange
+        int[] custom = [401, status];
+
+        // Act
+        var exception = Record.Exception(() => MinimalApiConfiguration.ResolveGlobalProblems(custom));
+
+        // Assert
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
     }
 }

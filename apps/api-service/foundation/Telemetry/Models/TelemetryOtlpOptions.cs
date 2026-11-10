@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Telemetry.Models;
 
 /// <summary>
 /// The connection to the OpenTelemetry collector, shared by logs, metrics and traces.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public record TelemetryOtlpOptions
 {
     /// <summary>

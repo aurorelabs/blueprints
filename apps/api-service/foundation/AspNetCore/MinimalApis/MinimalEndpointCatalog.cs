@@ -31,6 +31,7 @@ public sealed class MinimalEndpointCatalog
         ];
     }
 
+    /// <summary>Every resource group with its endpoints.</summary>
     public IReadOnlyList<ResourceEndpoints> Resources { get; }
 
     /// <summary>

@@ -19,6 +19,7 @@
     <Project Path="foundation/tests/Tests.AspNetCore/Tests.AspNetCore.csproj" Id="7aca3787-f127-4950-9ecb-65fe650edb62" />
     <Project Path="foundation/tests/Tests.Core/Tests.Core.csproj" Id="6baf4ef8-c11d-4ea0-96f9-16656aa3a6b8" />
     <Project Path="foundation/tests/Tests.EntityFrameworkCore/Tests.EntityFrameworkCore.csproj" Id="7ed4b3a3-1684-4443-b655-41695abb5c08" />
+    <Project Path="foundation/tests/Tests.Shared/Tests.Shared.csproj" />
     <Project Path="foundation/tests/Tests.Telemetry/Tests.Telemetry.csproj" Id="2beb96aa-ffe9-41ad-a809-e5122a462dd4" />
   </Folder>
   <Project Path="src/App.Api/App.Api.csproj" Id="a7b5cad0-01ec-4a23-b1a4-84c7e0bcc8c6" />

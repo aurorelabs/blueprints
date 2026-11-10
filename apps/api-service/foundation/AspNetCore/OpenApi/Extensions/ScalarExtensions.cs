@@ -8,6 +8,7 @@ using Aurore.Foundation.AspNetCore.Configuration;
 using Aurore.Foundation.AspNetCore.Constants;
 using Aurore.Foundation.AspNetCore.MinimalApis;
 using Aurore.Foundation.AspNetCore.OpenApi.Constants;
+using Aurore.Foundation.AspNetCore.RequestPipeline.Filters;
 using Aurore.Foundation.AspNetCore.RequestPipeline.Middlewares;
 using Aurore.Foundation.Core.Application.Models;
 using Aurore.Foundation.Core.Authentication.Models;
@@ -22,6 +23,7 @@ using Scalar.AspNetCore;
 
 namespace Aurore.Foundation.AspNetCore.OpenApi.Extensions;
 
+/// <summary>Configures the OpenAPI documents and the Scalar reference UI.</summary>
 public static class ScalarExtensions
 {
     /// <summary>
@@ -68,6 +70,7 @@ public static class ScalarExtensions
                 .WithSelectedScopes(identityProvider.Scopes.Keys));
     }
 
+    /// <summary>Fills the document's title, version, description and contact from the application information.</summary>
     public static OpenApiOptions AddAuroreDocumentInfo(this OpenApiOptions options, MinimalEndpointVersion version, AppInformationOptions appInfo)
     {
         var notice = version switch
@@ -95,6 +98,7 @@ public static class ScalarExtensions
         });
     }
 
+    /// <summary>Adds a security scheme to the document and requires it on every operation.</summary>
     public static OpenApiOptions AddAuroreSecuritySchemeAndRequirement(this OpenApiOptions options, OpenApiSecurityScheme schema, params string[] scopes)
     {
         if (schema.Name.HasValue() is false)
@@ -134,6 +138,7 @@ public static class ScalarExtensions
         return metadata.OfType<IAuthorizeData>().Any() && metadata.OfType<IAllowAnonymous>().Any() is false;
     }
 
+    /// <summary>Documents bearer token authentication.</summary>
     public static OpenApiOptions AddAuroreJwtBearerSecurity(this OpenApiOptions options)
     {
         return options.AddAuroreSecuritySchemeAndRequirement(new OpenApiSecurityScheme
@@ -164,6 +169,7 @@ public static class ScalarExtensions
         });
     }
 
+    /// <summary>Documents OpenID Connect authentication against the configured identity provider.</summary>
     public static OpenApiOptions AddAuroreOidcSecurity(this OpenApiOptions options, IdentityProviderOptions identityProvider)
     {
         return options.AddAuroreSecuritySchemeAndRequirement(new OpenApiSecurityScheme
@@ -175,6 +181,7 @@ public static class ScalarExtensions
         });
     }
 
+    /// <summary>Documents the OAuth2 authorization code flow against the configured identity provider.</summary>
     public static OpenApiOptions AddAuroreOAuth2Security(this OpenApiOptions options, IdentityProviderOptions identityProvider)
     {
         var authority = identityProvider.AuthorityUrl.TrimEnd('/');
@@ -199,6 +206,64 @@ public static class ScalarExtensions
         });
     }
 
+    /// <summary>
+    /// Writes the names of the query parameters in camel case ("pageSize", not "PageSize"), the same rule the JSON of the
+    /// bodies follows. The generator uses the C# property names for them, which the JSON naming policy never touches.
+    /// Binding ignores case, so this only changes what the document says. Headers and route values are left as they are.
+    /// </summary>
+    public static OpenApiOptions AddAuroreCamelCaseQueryParameters(this OpenApiOptions options)
+    {
+        return options.AddOperationTransformer((operation, _, _) =>
+        {
+            foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
+            {
+                if (parameter.In == ParameterLocation.Query && parameter.Name.HasValue())
+                    parameter.Name = parameter.Name.ToCamelCase();
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// Documents the Idempotency-Key request header on the operations that use it, those marked with WithIdempotency, and
+    /// only there. It is required when the endpoint was marked required: true, optional otherwise.
+    /// </summary>
+    public static OpenApiOptions AddAuroreIdempotencyKeyHeader(this OpenApiOptions options)
+    {
+        return options.AddOperationTransformer((operation, context, _) =>
+        {
+            var idempotency = context.Description.ActionDescriptor.EndpointMetadata.OfType<IdempotencyMetadata>().FirstOrDefault();
+
+            if (idempotency is null)
+                return Task.CompletedTask;
+
+            operation.Parameters ??= [];
+
+            if (operation.Parameters.All(p => p.Name != CustomHeaderNames.IdempotencyKey))
+            {
+                operation.Parameters.Add(new OpenApiParameter
+                {
+                    Name = CustomHeaderNames.IdempotencyKey,
+                    In = ParameterLocation.Header,
+                    Required = idempotency.Required,
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.String,
+                        Pattern = RequestContextMiddleware.IdempotencyKeyPattern,
+                        MinLength = RequestContextMiddleware.MinIdempotencyKeyLength,
+                        MaxLength = RequestContextMiddleware.MaxIdempotencyKeyLength,
+                        Example = JsonValue.Create(Guid.NewGuid().ToString())
+                    },
+                    Description = $"Idempotency Key for request idempotence. Letters, digits, '.', '_' and '-', {RequestContextMiddleware.MinIdempotencyKeyLength} to {RequestContextMiddleware.MaxIdempotencyKeyLength} characters."
+                });
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>Documents the optional Correlation-Id request header on every operation.</summary>
     public static OpenApiOptions AddAuroreCorrelationIdHeader(this OpenApiOptions options)
     {
         return options.AddDocumentTransformer((document, _, _) =>
@@ -223,10 +288,11 @@ public static class ScalarExtensions
                             {
                                 Type = JsonSchemaType.String,
                                 Pattern = RequestContextMiddleware.CorrelationIdPattern,
+                                MinLength = RequestContextMiddleware.MinCorrelationIdLength,
                                 MaxLength = RequestContextMiddleware.MaxCorrelationIdLength,
                                 Example = JsonValue.Create(Guid.NewGuid().ToString())
                             },
-                            Description = "Correlation Id for request tracking and tracing. Letters, digits, '.', '_' and '-', up to 64 characters; a new one is generated when missing or invalid."
+                            Description = $"Correlation Id for request tracking and tracing. Letters, digits, '.', '_' and '-', {RequestContextMiddleware.MinCorrelationIdLength} to {RequestContextMiddleware.MaxCorrelationIdLength} characters; a new one is generated when missing or invalid."
                         });
                     }
                 }

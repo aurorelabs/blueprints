@@ -5,8 +5,10 @@ using OpenTelemetry.Exporter;
 
 namespace Aurore.Foundation.Telemetry.Validators;
 
+/// <summary>Checks the collector connection settings.</summary>
 public sealed class TelemetryOtlpOptionsValidator : AbstractValidator<TelemetryOtlpOptions>
 {
+    /// <summary>Creates the validator. The flag turns on the stricter production rules.</summary>
     public TelemetryOtlpOptionsValidator(bool isProduction)
     {
         RuleFor(x => x.Endpoint).Must(x => x.IsAbsoluteUrl())

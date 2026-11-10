@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Aurore.Foundation.AspNetCore.HttpDependencies.Configuration;
 
+/// <summary>Registers HTTP clients for upstream services.</summary>
 public static class HttpDependencyConfiguration
 {
     /// <summary>

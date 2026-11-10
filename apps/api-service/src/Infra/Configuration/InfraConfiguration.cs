@@ -1,4 +1,3 @@
-using System;
 using Aurore.Blueprints.ApiService.Core.Clients.GitHub;
 using Aurore.Blueprints.ApiService.Core.Constants;
 using Aurore.Blueprints.ApiService.Core.Settings;
@@ -6,7 +5,6 @@ using Aurore.Blueprints.ApiService.Infra.Clients.GitHub;
 using Aurore.Blueprints.ApiService.Infra.Clients.RandomUser;
 using Aurore.Foundation.AspNetCore.HttpDependencies.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Aurore.Blueprints.ApiService.Infra.Configuration;
 
@@ -25,7 +23,6 @@ public static class InfraConfiguration
         services.AddAuroreHttpDependency<IGitHubClient, GitHubClient>(HttpDependencyNames.GitHub, dependencies.GetRequired(HttpDependencyNames.GitHub));
 
         // Untyped, custom authentication handler.
-        services.TryAddSingleton(TimeProvider.System);
         services.AddTransient<RandomUserSigningHandler>();
         services
             .AddAuroreHttpDependency(HttpDependencyNames.RandomUser, dependencies.GetRequired(HttpDependencyNames.RandomUser))

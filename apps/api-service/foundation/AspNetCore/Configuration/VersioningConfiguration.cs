@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Aurore.Foundation.AspNetCore.Configuration;
 
+/// <summary>Configures API versioning by URL segment (/v1/, /v2/).</summary>
 public static class VersioningConfiguration
 {
     /// <summary>

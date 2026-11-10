@@ -1,3 +1,4 @@
+using Aurore.Blueprints.ApiService.App.Api.Demo.Layers;
 using Aurore.Foundation.AspNetCore.MinimalApis;
 using Aurore.Foundation.AspNetCore.MinimalApis.Configuration;
 using Microsoft.AspNetCore.Builder;
@@ -7,8 +8,6 @@ namespace Aurore.Blueprints.ApiService.App.Api.Configuration;
 
 internal static class ResourcesConfiguration
 {
-    internal const string ConfiguredByHeader = "X-Configured-By";
-
     internal static WebApplication MapAppResources(this WebApplication app, MinimalEndpointCatalog endpoints)
     {
         app.MapAuroreMinimalEndpoints(endpoints, api => api
@@ -17,7 +16,7 @@ internal static class ResourcesConfiguration
             // Layering demo (see Examples.http); remove when no longer needed.
             .AddEndpointFilter((context, next) =>
             {
-                context.HttpContext.Response.Headers[ConfiguredByHeader] = "app";
+                context.HttpContext.Response.Headers[LayersResource.ConfiguredByHeader] = "app";
                 context.HttpContext.Response.Headers["X-Level-App"] = "true";
 
                 return next(context);

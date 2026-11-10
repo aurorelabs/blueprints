@@ -4,8 +4,10 @@ using FluentValidation;
 
 namespace Aurore.Foundation.Core.HttpDependencies.Validators;
 
+/// <summary>Checks the settings of an upstream HTTP service; production rejects insecure values.</summary>
 public sealed class HttpDependencyOptionsValidator : AbstractValidator<HttpDependencyOptions>
 {
+    /// <summary>Creates the validator. The flag turns on the stricter production rules.</summary>
     public HttpDependencyOptionsValidator(bool isProduction)
     {
         RuleFor(x => x.BaseUrl).Must(x => x.IsAbsoluteUrl())

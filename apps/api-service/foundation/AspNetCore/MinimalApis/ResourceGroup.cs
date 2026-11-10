@@ -13,7 +13,7 @@ namespace Aurore.Foundation.AspNetCore.MinimalApis;
 ///   endpoint     Map(...) =&gt; ... .ProducesProblem(...)                that endpoint only
 ///
 /// Authorization: groups require an authenticated caller by default, so a new endpoint without auth fails closed.
-/// Narrow it in the group's Configure (group.RequireAuthorization(p =&gt; p.RequireAuroreScope("api.write"))) or per endpoint;
+/// Narrow it in the group's Configure (group.RequireScopes("api.write")) or per endpoint;
 /// requirements from every level must pass. Opt out with RequireAuthorization =&gt; false (group) or .AllowAnonymous() (endpoint).
 ///
 /// Groups and endpoints are created once at startup with their parameterless constructors; handler parameters (services,
@@ -21,16 +21,24 @@ namespace Aurore.Foundation.AspNetCore.MinimalApis;
 /// </summary>
 public abstract class ResourceGroup
 {
+    /// <summary>The class name without "Resource".</summary>
     public virtual string TypeName => GetType().Name.Replace("Resource", string.Empty);
 
+    /// <summary>The URL segment of the group. Defaults to the type name in slug case.</summary>
     public virtual string Name => TypeName.ToSlugCase();
 
+    /// <summary>Whether the group's URL starts with /api.</summary>
     public virtual bool PrefixWithApi => false;
 
+    /// <summary>
+    /// Whether callers must be authenticated. True by default, so a new endpoint without authorization fails closed.
+    /// </summary>
     public virtual bool RequireAuthorization => true;
 
+    /// <summary>The tags that group the endpoints in the API document. Defaults to the type name.</summary>
     public virtual string[] Tags => [TypeName];
 
+    /// <summary>The API versions the group exposes. Defaults to version 1.</summary>
     public virtual MinimalEndpointVersion[] Versions => [1];
 
     /// <summary>
@@ -38,6 +46,7 @@ public abstract class ResourceGroup
     /// </summary>
     public virtual int[] Problems => [];
 
+    /// <summary>Adds conventions to every endpoint of the group, such as narrower authorization.</summary>
     public virtual void Configure(RouteGroupBuilder builder)
     {
     }

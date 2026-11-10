@@ -18,11 +18,12 @@ namespace Aurore.Foundation.AspNetCore.Authentication.Handlers;
 
 /// <summary>
 /// The caller identity is the client name; its Roles become role claims and its Scopes one "scope" claim, so the
-/// RequireAuroreRole/RequireAuroreScope policies work for API-key callers exactly as for JWT callers.
+/// RequireRoles/RequireScopes work for API-key callers exactly as for JWT callers.
 /// </summary>
 public sealed class ApiKeyAuthenticationHandler(IOptionsMonitor<ApiKeyAuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<ApiKeyAuthenticationSchemeOptions>(options, logger, encoder)
 {
+    /// <summary>Authenticates the caller when the key header matches one of the configured clients.</summary>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var presented = Request.Headers[Options.HeaderName].ToString();
@@ -44,6 +45,7 @@ public sealed class ApiKeyAuthenticationHandler(IOptionsMonitor<ApiKeyAuthentica
         return Task.FromResult(AuthenticateResult.Fail("Invalid API key."));
     }
 
+    /// <summary>Answers an unauthenticated request with a 401.</summary>
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
         Response.StatusCode = StatusCodes.Status401Unauthorized;

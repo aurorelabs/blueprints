@@ -1,5 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Core.RequestPipeline.Models;
 
+/// <summary>Settings of response compression.</summary>
+[ExcludeFromCodeCoverage]
 public sealed record ResponseCompressionConfigurationOptions
 {
     /// <summary>

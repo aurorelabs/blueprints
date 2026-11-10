@@ -4,16 +4,20 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 
 namespace Aurore.Foundation.Core.Extensions;
 
+/// <summary>Text helpers: checks, comparison and case conversion.</summary>
 public static class StringExtensions
 {
+    /// <summary>True when the text is not null, empty or whitespace.</summary>
     public static bool HasValue([NotNullWhen(true)] this string? value)
     {
         return string.IsNullOrWhiteSpace(value) is false;
     }
 
+    /// <summary>Removes accents, so "Ação" becomes "Acao". Null becomes an empty string.</summary>
     public static string RemoveDiacritics(this string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -31,6 +35,7 @@ public static class StringExtensions
         return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 
+    /// <summary>Case-insensitive, culture-independent comparison.</summary>
     public static bool IsEqualTo(this string? value, string? target)
     {
         return string.Equals(value, target, StringComparison.OrdinalIgnoreCase);
@@ -91,6 +96,7 @@ public static class StringExtensions
         return char.IsUpper(previous) && index + 1 < value.Length && char.IsLower(value[index + 1]);
     }
 
+    /// <summary>First letter upper case, the rest lower case.</summary>
     public static string ToSentenceCase(this string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -99,27 +105,40 @@ public static class StringExtensions
         return char.ToUpperInvariant(value[0]) + value[1..].ToLowerInvariant();
     }
 
+    /// <summary>Splits the text into words and capitalizes each: "apiService" becomes "Api Service".</summary>
     public static string ToTitleCase(this string? value)
     {
         return string.Join(' ', value.SplitWords().Select(ToSentenceCase));
     }
 
+    /// <summary>
+    /// First word lower case, the others capitalized, the way System.Text.Json writes camel case: "PageSize" becomes
+    /// "pageSize". Null becomes an empty string.
+    /// </summary>
+    public static string ToCamelCase(this string? value)
+    {
+        return value is null ? string.Empty : JsonNamingPolicy.CamelCase.ConvertName(value);
+    }
+
+    /// <summary>
+    /// Words joined with underscores, without accents, lower case ("ApiService" becomes "api_service") or upper case
+    /// ("API_SERVICE"). Uses the System.Text.Json snake case policy. Null becomes an empty string.
+    /// </summary>
     public static string ToSnakeCase(this string? value, bool lowercase = true)
     {
-        return JoinWords(value.RemoveDiacritics(), '_', lowercase);
+        var policy = lowercase ? JsonNamingPolicy.SnakeCaseLower : JsonNamingPolicy.SnakeCaseUpper;
+
+        return policy.ConvertName(value.RemoveDiacritics());
     }
 
+    /// <summary>
+    /// Words joined with hyphens, without accents, lower case ("ApiService" becomes "api-service") or upper case
+    /// ("API-SERVICE"). Uses the System.Text.Json kebab case policy. Null becomes an empty string.
+    /// </summary>
     public static string ToSlugCase(this string? value, bool lowercase = true)
     {
-        return JoinWords(value.RemoveDiacritics(), '-', lowercase);
-    }
+        var policy = lowercase ? JsonNamingPolicy.KebabCaseLower : JsonNamingPolicy.KebabCaseUpper;
 
-    private static string JoinWords(string value, char separator, bool lowercase)
-    {
-        var words = value.SplitWords();
-
-        return lowercase
-            ? string.Join(separator, words).ToLowerInvariant()
-            : string.Join(separator, words.Select(ToSentenceCase));
+        return policy.ConvertName(value.RemoveDiacritics());
     }
 }

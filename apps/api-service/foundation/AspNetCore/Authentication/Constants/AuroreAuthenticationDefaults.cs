@@ -1,5 +1,6 @@
 namespace Aurore.Foundation.AspNetCore.Authentication.Constants;
 
+/// <summary>Names of the authentication schemes the foundation registers.</summary>
 public static class AuroreAuthenticationDefaults
 {
     /// <summary>

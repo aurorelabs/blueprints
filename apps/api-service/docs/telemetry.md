@@ -1,27 +1,12 @@
-# Telemetry (OpenTelemetry)
+# Telemetry
 
-The service emits **logs, metrics and traces** over OTLP to a single endpoint: an OpenTelemetry **Collector**. The service
-never talks to Loki, Tempo, Prometheus and friends directly. Where the data goes is configured in the Collector, later,
-without redeploying the service.
+Logs, metrics and traces are sent over OTLP to one OpenTelemetry Collector. The Collector decides where the data goes.
 
 ```csharp
 builder.AddAuroreTelemetry(appSettings.AppInformation, appSettings.Telemetry);
 ```
 
-Code: `foundation/Telemetry/Configuration/TelemetryConfiguration.cs`.
-
-## What is exported
-
-- **Resource attributes** on every signal: service name/namespace/version/instance, environment, domain, boundary,
-  maintainer, plus anything in `Telemetry:ResourceAttributes`.
-- **Logs**: `ILogger` output through OTLP, with formatted message, scopes and parsed state values (configurable). A console
-  logger stays on as well so logs remain visible if the collector is down: single-line in Development, JSON elsewhere.
-- **Metrics**: ASP.NET Core, HttpClient, runtime and process instrumentation, plus the `Npgsql` meter.
-- **Traces**: ASP.NET Core and HttpClient instrumentation (exceptions recorded, error status on exception), the app's
-  activity source, the infrastructure source and `Npgsql`.
-
-At startup `TelemetryStartupLogger` logs the protocol, endpoint and sampling ratio, so a wrong collector address is visible
-in the first log lines.
+Code: `foundation/Telemetry/Configuration/TelemetryConfiguration.cs`. At startup the protocol, endpoint and sampling ratio are logged.
 
 ## Settings
 
@@ -35,67 +20,37 @@ in the first log lines.
 }
 ```
 
-`BatchExport` = `MaxQueueSize` (2048), `MaxExportBatchSize` (512, must be <= queue), `ScheduledDelaySeconds` (5),
-`ExportTimeoutSeconds` (30). `TelemetryOptionsValidator` checks everything at startup.
+`BatchExport`: `MaxQueueSize` 2048, `MaxExportBatchSize` 512 (not above the queue), `ScheduledDelaySeconds` 5, `ExportTimeoutSeconds` 30.
 
-### Protocol and endpoint (gRPC vs HTTP)
+- **Protocol**: `Grpc` (port 4317) uses the endpoint as-is. `HttpProtobuf` (port 4318) needs `/v1/traces|metrics|logs`; the
+  service appends them, so configure only the base URL.
+- **Sampling**: `SamplingRatio` is head sampling (decided when the trace starts, parent-based). For "keep errors and slow
+  traces", leave it at 1.0 and sample in the Collector.
+- **Excluded paths**: `/health/` is never traced. Add more prefixes in the two `Excluded*` lists.
+- **Local debugging**: `ExportToConsole` prints signals without a collector.
+- Production rejects a localhost endpoint.
 
-`Protocol` is `Grpc` or `HttpProtobuf`.
-
-- **gRPC** (port 4317): the endpoint is used as-is (`http://collector:4317`).
-- **HTTP/protobuf** (port 4318): each signal needs its own path. When the endpoint is set in code the SDK does **not**
-  append them, so the service does (`BuildOtlpEndpoint`): `/v1/traces`, `/v1/metrics`, `/v1/logs`. Configure only the base
-  (`http://collector:4318`). Verified against a real listener: without the suffix the data went to the wrong URL.
-
-Production rejects a localhost collector.
-
-### Sampling
-
-`Tracing:SamplingRatio` (0..1) is **head sampling**: the decision is taken when a trace starts, by trace-id ratio, and
-respects the parent's decision (`ParentBased`), so a trace is kept or dropped whole across services.
-
-- Keep `1.0` while volume is low. Lower it when cost or volume demands.
-- Head sampling cannot know whether a trace will turn out slow or failed. To "keep all errors and slow traces, sample the
-  rest", leave the service at `1.0` (or a high ratio) and do **tail sampling in the Collector**.
-
-### Excluded paths
-
-Health probes (`/health/...`) are never traced, whatever is configured. `ExcludedIncomingPaths` and `ExcludedOutgoingPaths`
-add more prefixes (case-insensitive `StartsWith`). Empty lists are fine.
-
-## How-to: add a custom metric
+## Add a custom metric
 
 ```csharp
-// one Meter per component, named after the app (static, created once)
 public static class AppMetrics
 {
     public static readonly Meter Meter = new("Aurore.Blueprints.ApiService");
     public static readonly Counter<long> OrdersCreated = Meter.CreateCounter<long>("orders.created");
 }
 
-// at the call site
 AppMetrics.OrdersCreated.Add(1, new KeyValuePair<string, object?>("channel", "web"));
 ```
 
-Then register the meter name in `ConfigureMetrics`: `.AddMeter("Aurore.Blueprints.ApiService")`. A meter that is not
-registered is silently ignored.
+Register the name in `ConfigureMetrics`: `.AddMeter("Aurore.Blueprints.ApiService")`. Unregistered meters are ignored.
 
-## How-to: add a trace source
+## Add a trace source
 
 ```csharp
 private static readonly ActivitySource Source = new("Aurore.Orders.Checkout");
 
-using var activity = Source.StartActivity("ProcessOrder");
+using var activity = Source.StartActivity("ProcessOrder");   // null when nobody listens
 activity?.SetTag("order.id", id);
 ```
 
-Register it in `ConfigureTracing`: `.AddSource("Aurore.Orders.Checkout")`. Use one source per library or business flow
-(for example `Aurore.Foundation.Messaging`). `StartActivity` returns `null` when nothing listens, so always use `?.`.
-
-## Local debugging
-
-Set `Metrics:ExportToConsole` / `Tracing:ExportToConsole` to `true` to print signals to the console without a collector.
-
-## Units
-
-Settings are in seconds. The SDK takes milliseconds, so `ToMilliseconds` converts in one place; nothing else uses milliseconds.
+Register it in `ConfigureTracing`: `.AddSource("Aurore.Orders.Checkout")`.

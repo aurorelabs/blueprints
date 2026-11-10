@@ -3,6 +3,7 @@ using Aurore.Foundation.Core.Application.Models;
 using Aurore.Foundation.Core.Authentication.Models;
 using Aurore.Foundation.Core.HealthChecks.Models;
 using Aurore.Foundation.Core.HttpDependencies.Models;
+using Aurore.Foundation.Core.Pagination.Models;
 using Aurore.Foundation.Core.RequestPipeline.Models;
 using Aurore.Foundation.Telemetry.Models;
 
@@ -16,6 +17,8 @@ public sealed record AppSettings
     public ApiKeysOptions ApiKeys { get; init; } = new();
     public required TelemetryOptions Telemetry { get; init; }
     public HealthChecksOptions HealthChecks { get; init; } = new();
+    public HostingOptions Hosting { get; init; } = new();
     public RequestPipelineOptions RequestPipeline { get; init; } = new();
+    public PaginationOptions Pagination { get; init; } = new();
     public IReadOnlyDictionary<string, HttpDependencyOptions> HttpDependencies { get; init; } = new Dictionary<string, HttpDependencyOptions>();
 }

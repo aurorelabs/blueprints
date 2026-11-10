@@ -9,6 +9,7 @@ public sealed class ConfigurationBindingTests
     [Fact(DisplayName = "Known sections bind and unrelated sections are ignored")]
     public void KnownSectionsBindAndUnrelatedOnesAreIgnored()
     {
+        // Arrange
         var configuration = Build(new()
         {
             ["Sample:Name"] = "orders",
@@ -17,8 +18,10 @@ public sealed class ConfigurationBindingTests
             ["AllowedHosts"] = "*",
         });
 
+        // Act
         var settings = configuration.GetStrict<RootSettings>();
 
+        // Assert
         Assert.Equal("orders", settings.Sample.Name);
         Assert.Equal(3, settings.Sample.Nested.Retries);
     }
@@ -26,14 +29,17 @@ public sealed class ConfigurationBindingTests
     [Fact(DisplayName = "Throws when a key inside a known section is not recognized")]
     public void ThrowsWhenAKnownSectionHasAnUnknownKey()
     {
+        // Arrange
         var configuration = Build(new()
         {
             ["Sample:Name"] = "orders",
             ["Sample:Nested:Retrys"] = "3",
         });
 
+        // Act
         var error = Assert.Throws<InvalidOperationException>(() => configuration.GetStrict<RootSettings>());
 
+        // Assert
         Assert.Contains("Retrys", error.Message);
     }
 

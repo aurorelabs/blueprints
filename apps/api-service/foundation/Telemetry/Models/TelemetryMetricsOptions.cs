@@ -1,7 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Telemetry.Models;
 
+/// <summary>Settings of metric export.</summary>
+[ExcludeFromCodeCoverage]
 public record TelemetryMetricsOptions
 {
+    /// <summary>Also write the metrics to the console, which helps when no collector is running.</summary>
     public bool ExportToConsole { get; init; } = false;
 
     /// <summary>Interval between two metric exports.</summary>

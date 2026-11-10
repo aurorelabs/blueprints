@@ -17,8 +17,9 @@
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 
-    <!-- Auto-detect test projects by path pattern -->
+    <!-- Auto-detect test projects by path pattern. Test results go to /artifacts/test-results instead of a TestResults folder in the root. -->
     <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('\tests\')) Or $(MSBuildProjectDirectory.Contains('/tests/'))">
         <IsTestProject>true</IsTestProject>
+        <TestingPlatformCommandLineArguments>--results-directory "$(MSBuildThisFileDirectory)artifacts/test-results"</TestingPlatformCommandLineArguments>
     </PropertyGroup>
 </Project>

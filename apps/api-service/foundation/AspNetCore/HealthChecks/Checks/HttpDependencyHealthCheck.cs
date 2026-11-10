@@ -7,15 +7,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Aurore.Foundation.AspNetCore.HealthChecks.Checks;
 
+/// <summary>Calls an upstream HTTP service and reports whether it answered with a success status.</summary>
 public sealed class HttpDependencyHealthCheck(ILogger<HttpDependencyHealthCheck> logger, IHttpClientFactory clientFactory) : IHealthCheck
 {
     private const string ClientNamePrefix = "health-check-";
 
+    /// <summary>The name of the HTTP client used to check the named dependency.</summary>
     public static string GetClientName(string checkName)
     {
         return $"{ClientNamePrefix}{checkName}";
     }
 
+    /// <summary>
+    /// Calls the dependency. Success is healthy; any other status or a failure to connect gives the check's failure
+    /// status.
+    /// </summary>
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         var name = context.Registration.Name;

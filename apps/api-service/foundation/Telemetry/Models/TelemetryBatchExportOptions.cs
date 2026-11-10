@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Aurore.Foundation.Telemetry.Models;
 
 /// <summary>
 /// Batching behavior for log and trace export. Defaults match the OpenTelemetry SDK defaults.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public record TelemetryBatchExportOptions
 {
     /// <summary>Records buffered in memory; when full, new records are dropped.</summary>

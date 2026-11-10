@@ -4,8 +4,10 @@ using FluentValidation;
 
 namespace Aurore.Foundation.Core.Authentication.Validators;
 
+/// <summary>Checks the identity provider settings; production rejects insecure values.</summary>
 public sealed class IdentityProviderOptionsValidator : AbstractValidator<IdentityProviderOptions>
 {
+    /// <summary>Creates the validator. The flag turns on the stricter production rules.</summary>
     public IdentityProviderOptionsValidator(bool isProduction)
     {
         RuleFor(x => x.AuthorityUrl).Must(x => x.IsAbsoluteUrl())
@@ -22,6 +24,8 @@ public sealed class IdentityProviderOptionsValidator : AbstractValidator<Identit
         RuleFor(x => x.RequireHttpsMetadata).Equal(true).When(_ => isProduction)
             .WithMessage("RequireHttpsMetadata must be true in production.");
 
+        RuleFor(x => x.Provider).IsInEnum();
+        RuleFor(x => x.ClockSkewSeconds).InclusiveBetween(0, 300);
         RuleFor(x => x.Audience).NotEmpty();
         RuleFor(x => x.AuthorizationPath).NotEmpty();
         RuleFor(x => x.TokenPath).NotEmpty();

@@ -27,13 +27,15 @@ internal static class ScalarConfiguration
                     .AddAuroreApiKeySecurity(appSettings.ApiKeys)
                     .AddAuroreOidcSecurity(appSettings.IdentityProvider)
                     .AddAuroreOAuth2Security(appSettings.IdentityProvider)
-                    .AddAuroreCorrelationIdHeader());
+                    .AddAuroreCamelCaseQueryParameters()
+                    .AddAuroreCorrelationIdHeader()
+                    .AddAuroreIdempotencyKeyHeader());
         }
 
         return builder;
     }
 
-    internal static WebApplication UseAppScalar(this WebApplication app, AppSettings appSettings)
+    internal static WebApplication MapAppScalar(this WebApplication app, AppSettings appSettings)
     {
         if (app.Environment.IsProduction())
             return app;
@@ -42,7 +44,7 @@ internal static class ScalarConfiguration
 
         app.MapScalarApiReference(options => options
             .WithTitle($"{appSettings.AppInformation.Component.ToTitleCase()} API")
-            .WithTheme(ScalarTheme.DeepSpace)
+            .WithTheme(ScalarTheme.Default)
             .WithDefaultHttpClient(ScalarTarget.Shell, ScalarClient.Curl)
             .WithAuroreAuthentication(appSettings.IdentityProvider, appSettings.ApiDocs));
 

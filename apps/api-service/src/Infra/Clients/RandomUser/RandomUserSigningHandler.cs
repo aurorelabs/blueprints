@@ -19,8 +19,8 @@ internal sealed class RandomUserSigningHandler(TimeProvider timeProvider) : Dele
         var payload = $"{request.Method}\n{request.RequestUri?.PathAndQuery}\n{timestamp}";
         var signature = Convert.ToHexStringLower(HMACSHA256.HashData(_signingKey, Encoding.UTF8.GetBytes(payload)));
 
-        request.Headers.TryAddWithoutValidation("AL-Timestamp", timestamp);
-        request.Headers.TryAddWithoutValidation("AL-Signature", signature);
+        request.Headers.TryAddWithoutValidation("AUR-Timestamp", timestamp);
+        request.Headers.TryAddWithoutValidation("AUR-Signature", signature);
 
         return base.SendAsync(request, cancellationToken);
     }
