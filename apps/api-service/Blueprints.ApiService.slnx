@@ -1,26 +1,27 @@
 <Solution>
   <Folder Name="/0. Root/">
-    <File Path="../../README.md" />
     <File Path=".editorconfig" />
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />
+    <File Path="docker-compose.yaml" />
+    <File Path="Dockerfile" />
+    <File Path="Dockerfile.dockerignore" />
+    <File Path="README.md" />
   </Folder>
   <Folder Name="/1. Tests/">
     <Project Path="tests/Tests.Integration/Tests.Integration.csproj" Id="876ca788-395f-4508-a998-490b5e361852" />
     <Project Path="tests/Tests/Tests.csproj" Id="d325e9b2-b944-4253-a6b5-323ecb293c7b" />
+    <Project Path="tests/Tests.Features/Tests.Features.csproj" />
+    <Project Path="tests/Tests.Support/Tests.Support.csproj" />
   </Folder>
   <Folder Name="/2. Foundation/">
-    <Project Path="foundation/AspNetCore/AspNetCore.csproj" Id="f8ad72b6-eb37-4542-9193-8a522d5af87a" />
-    <Project Path="foundation/Core/Core.csproj" Id="a31f60cf-3b37-48d0-b116-e655bd072da2" />
-    <Project Path="foundation/EntityFrameworkCore/EntityFrameworkCore.csproj" Id="29377d5f-5738-4daa-b292-1bbcd2d860c8" />
-    <Project Path="foundation/Telemetry/Telemetry.csproj" Id="ff22741f-deda-490d-bf62-004eba2c7fab" />
+    <Project Path="../../../foundation/src/AspNetCore/AspNetCore.csproj" />
+    <Project Path="../../../foundation/src/Core/Core.csproj" />
+    <Project Path="../../../foundation/src/EntityFrameworkCore.Postgres/EntityFrameworkCore.Postgres.csproj" />
+    <Project Path="../../../foundation/src/Telemetry/Telemetry.csproj" />
   </Folder>
-  <Folder Name="/2. Foundation/Tests/">
-    <Project Path="foundation/tests/Tests.AspNetCore/Tests.AspNetCore.csproj" Id="7aca3787-f127-4950-9ecb-65fe650edb62" />
-    <Project Path="foundation/tests/Tests.Core/Tests.Core.csproj" Id="6baf4ef8-c11d-4ea0-96f9-16656aa3a6b8" />
-    <Project Path="foundation/tests/Tests.EntityFrameworkCore/Tests.EntityFrameworkCore.csproj" Id="7ed4b3a3-1684-4443-b655-41695abb5c08" />
-    <Project Path="foundation/tests/Tests.Shared/Tests.Shared.csproj" />
-    <Project Path="foundation/tests/Tests.Telemetry/Tests.Telemetry.csproj" Id="2beb96aa-ffe9-41ad-a809-e5122a462dd4" />
+  <Folder Name="/T. Tools/">
+    <Project Path="tools/Tools.Migrations/Tools.Migrations.csproj" />
   </Folder>
   <Project Path="src/App.Api/App.Api.csproj" Id="a7b5cad0-01ec-4a23-b1a4-84c7e0bcc8c6" />
   <Project Path="src/Core/Core.csproj" Id="f3786771-ea0e-4efa-85ca-ddfe0dfa244e" />

@@ -39,7 +39,7 @@ try
         .AddAuroreAuthConfiguration(appSettings.IdentityProvider, appSettings.ApiKeys)
         .AddAuroreHealthChecks(appSettings.AppInformation, appSettings.HealthChecks, appSettings.HttpDependencies)
         .AddAppValidators(appSettings)
-        .AddAppFeatures(appSettings)
+        .AddAppFeatures()
         .AddAppInfra(appSettings);
 
     app = builder.Build();

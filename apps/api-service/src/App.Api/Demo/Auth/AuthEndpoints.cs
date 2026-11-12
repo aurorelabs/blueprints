@@ -20,7 +20,7 @@ internal sealed class GetAuthenticatedEndpoint : MinimalEndpoint<AuthResource>
         {
             return TypedResults.Ok(new
             {
-                Subject = user.FindFirstValue(ClaimTypes.NameIdentifier),
+                Subject = user.GetUserId(),
                 Claims = user.Claims.Select(x => new { x.Type, x.Value }),
             });
         }
@@ -87,7 +87,7 @@ internal sealed class GetBearerOnlyEndpoint : MinimalEndpoint<AuthResource>
     public override RouteHandlerBuilder Map(IEndpointRouteBuilder builder)
     {
         return builder
-            .MapGet("bearer-only", (ClaimsPrincipal user) => TypedResults.Ok(new { Subject = user.FindFirstValue(ClaimTypes.NameIdentifier) }))
+            .MapGet("bearer-only", (ClaimsPrincipal user) => TypedResults.Ok(new { Subject = user.GetUserId() }))
             .RequireAuthorization(policy => policy
                 .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser());

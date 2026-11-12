@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Security.Claims;
+using Aurore.Foundation.AspNetCore.Authentication.Extensions;
 using Aurore.Foundation.AspNetCore.MinimalApis;
 using Aurore.Foundation.Core.Application;
 using Aurore.Foundation.Core.Models;
@@ -58,7 +59,7 @@ internal sealed class GetAuthorizedEndpoint : MinimalEndpoint<DiagnosticsResourc
 
         static IResult Handle(ClaimsPrincipal user)
         {
-            return TypedResults.Ok(new { Subject = user.FindFirstValue(ClaimTypes.NameIdentifier), user.Identity?.Name });
+            return TypedResults.Ok(new { Subject = user.GetUserId(), user.Identity?.Name });
         }
     }
 }

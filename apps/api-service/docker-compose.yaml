@@ -1,0 +1,44 @@
+name: aur-projects
+
+services:
+  sv-blueprints-api-service:
+    build:
+      context: ../../..
+      dockerfile: blueprints/apps/api-service/Dockerfile
+    image: aur/blueprints-api-service:local
+    container_name: sv-blueprints-api-service
+    restart: unless-stopped
+    stop_grace_period: 15s
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Postgres__Host: sbx-postgres
+      RequestPipeline__ForwardedHeaders__KnownNetworks__0: 172.30.0.0/16
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /health/live HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - blueprints
+      - aur-sandbox
+
+  tests:
+    profiles: [tests]
+    build:
+      context: ../../..
+      dockerfile: blueprints/apps/api-service/Dockerfile
+      target: test
+    image: aur/blueprints-api-service:tests
+    environment:
+      TEST_POSTGRES_HOST: sbx-postgres
+    volumes:
+      - ./artifacts:/src/blueprints/apps/api-service/artifacts
+    networks:
+      - aur-sandbox
+
+networks:
+  blueprints: {}
+  aur-sandbox:
+    external: true
+    name: aur-sandbox

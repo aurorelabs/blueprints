@@ -143,13 +143,7 @@ dotnet_diagnostic.IDE0003.severity = error  # no this.
 dotnet_diagnostic.IDE0051.severity = error  # unused private members
 dotnet_diagnostic.IDE0052.severity = error  # unread private members
 
-# XML docs: not required in the application (the OpenAPI spec is the documentation); required in foundation/ (see the end of this file).
+# XML docs: not required in the application, the OpenAPI document is its documentation. The foundation packages require them (see the
+# .editorconfig of the foundation solution).
 
-dotnet_diagnostic.CS1591.severity = none
-
-# The foundation is the reusable layer: public API must be documented. Tests are exempt.
-[foundation/**.cs]
-dotnet_diagnostic.CS1591.severity = error
-
-[foundation/tests/**.cs]
 dotnet_diagnostic.CS1591.severity = none

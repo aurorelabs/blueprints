@@ -5,6 +5,7 @@ using Aurore.Foundation.Core.Extensions;
 using Aurore.Foundation.Core.HttpDependencies.Validators;
 using Aurore.Foundation.Core.Pagination.Validators;
 using Aurore.Foundation.Core.RequestPipeline.Validators;
+using Aurore.Foundation.EntityFrameworkCore.Postgres.Validators;
 using Aurore.Foundation.Telemetry.Validators;
 using FluentValidation;
 using Microsoft.Extensions.Hosting;
@@ -35,6 +36,7 @@ public sealed class AppSettingsValidator : AbstractValidator<AppSettings>
 
         RuleFor(x => x.IdentityProvider).NotNull().SetValidator(new IdentityProviderOptionsValidator(isProduction));
         RuleFor(x => x.Telemetry).NotNull().SetValidator(new TelemetryOptionsValidator(isProduction));
+        RuleFor(x => x.Postgres).NotNull().SetValidator(new PostgresOptionsValidator(isProduction));
         RuleFor(x => x.RequestPipeline).NotNull().SetValidator(new RequestPipelineOptionsValidator());
         RuleFor(x => x.Pagination).NotNull().SetValidator(new PaginationOptionsValidator());
 

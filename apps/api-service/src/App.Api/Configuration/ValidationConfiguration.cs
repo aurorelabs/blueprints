@@ -13,7 +13,6 @@ internal static class ValidationConfiguration
     internal static IServiceCollection AddAppValidators(this IServiceCollection services, AppSettings appSettings)
     {
         ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo(appSettings.AppInformation.Locale);
-        // ValidationErrorOptions.LocationFormat = ValidationErrorLocationFormat.FieldOnly;
 
         return services.AddAuroreValidators(
             [typeof(Program).Assembly, typeof(ICore).Assembly, typeof(IFeatures).Assembly],

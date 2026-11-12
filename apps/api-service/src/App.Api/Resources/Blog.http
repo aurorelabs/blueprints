@@ -1,0 +1,112 @@
+### The blog, from start to end. Run the requests in order (VS Code REST Client or the IDE's HTTP client).
+### Needs: the application running (as the container of the sandbox behind http://api.localhost, or from the IDE at https://localhost:5001: change @host), the database with the migration applied
+### (see docs/guides/database.md) and the Keycloak of the sandbox (http://auth.localhost:9999, realm aurorelabs).
+
+@host = http://api.localhost
+@keycloak = http://auth.localhost:9999/realms/aurorelabs/protocol/openid-connect/token
+@slug = hello-world
+
+### A token for bob (editor and admin). Use alice / alice for a reader.
+# @name loginBob
+POST {{keycloak}}
+Content-Type: application/x-www-form-urlencoded
+
+client_id=api-tests&grant_type=password&username=bob&password=bob
+
+###
+@bob = {{loginBob.response.body.access_token}}
+
+# @name loginAlice
+POST {{keycloak}}
+Content-Type: application/x-www-form-urlencoded
+
+client_id=api-tests&grant_type=password&username=alice&password=alice
+
+###
+@alice = {{loginAlice.response.body.access_token}}
+
+### Each author creates the own profile first (the handle never changes)
+PUT {{host}}/v1/authors/me
+Authorization: Bearer {{bob}}
+Content-Type: application/json
+
+{ "handle": "bob", "displayName": "Bob" }
+
+###
+PUT {{host}}/v1/authors/me
+Authorization: Bearer {{alice}}
+Content-Type: application/json
+
+{ "handle": "alice", "displayName": "Alice" }
+
+### Bob writes a draft. Repeating it with the same Idempotency-Key returns the same answer; without it, the slug is taken (409).
+# @name createPost
+POST {{host}}/v1/posts
+Authorization: Bearer {{bob}}
+Idempotency-Key: create-hello-world-0001
+Content-Type: application/json
+
+{ "slug": "{{slug}}", "title": "Hello, world", "body": "The first post." }
+
+###
+@postId = {{createPost.response.body.id}}
+
+### Alice cannot see the draft (404); Bob can
+GET {{host}}/v1/posts/{{slug}}
+Authorization: Bearer {{alice}}
+
+###
+GET {{host}}/v1/posts/{{slug}}
+Authorization: Bearer {{bob}}
+
+### A reader cannot write (403)
+POST {{host}}/v1/posts
+Authorization: Bearer {{alice}}
+Content-Type: application/json
+
+{ "slug": "another-one", "title": "Not allowed", "body": "Readers do not write." }
+
+### Publish (a second time is a 409)
+POST {{host}}/v1/posts/{{postId}}/publish
+Authorization: Bearer {{bob}}
+
+### The list: a numbered page. Try ?title=hello, ?orderBy=title, ?pageSize=1&pageNumber=2, ?status=Draft
+GET {{host}}/v1/posts?pageSize=5
+Authorization: Bearer {{alice}}
+
+### Alice comments
+POST {{host}}/v1/posts/{{postId}}/comments
+Authorization: Bearer {{alice}}
+Idempotency-Key: comment-0001
+Content-Type: application/json
+
+{ "body": "Nice first post." }
+
+### The comments as an infinite scroll: send the nextCursor of the answer back as ?cursor=
+GET {{host}}/v1/posts/{{postId}}/comments?pageSize=2
+Authorization: Bearer {{alice}}
+
+### More of the same story ------------------------------------------------------------------------------------
+
+### Change only the title (a PATCH: what is not sent stays, and so does the slug)
+PATCH {{host}}/v1/posts/{{postId}}
+Authorization: Bearer {{bob}}
+Content-Type: application/json
+
+{ "title": "Hello, world (edited)" }
+
+### The list filtered and ordered by author
+GET {{host}}/v1/posts?author=bob&orderBy=author:desc
+Authorization: Bearer {{alice}}
+
+### The feed: published posts as an infinite scroll. Send the nextCursor back as ?cursor=
+GET {{host}}/v1/feed?pageSize=2
+Authorization: Bearer {{alice}}
+
+### Delete a comment (admins only): put the id of a comment of the list above
+# DELETE {{host}}/v1/posts/{{postId}}/comments/<comment id>
+# Authorization: Bearer {{bob}}
+
+### Last, because it ends the story: only an admin deletes a post (alice gets 403)
+DELETE {{host}}/v1/posts/{{postId}}
+Authorization: Bearer {{bob}}

@@ -10,7 +10,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\foundation\AspNetCore\AspNetCore.csproj" />
+    <ProjectReference Include="..\..\..\..\..\foundation\src\AspNetCore\AspNetCore.csproj" />
+    <ProjectReference Include="..\..\..\..\..\foundation\src\EntityFrameworkCore.Postgres\EntityFrameworkCore.Postgres.csproj" />
     <ProjectReference Include="..\Core\Core.csproj" />
   </ItemGroup>
 

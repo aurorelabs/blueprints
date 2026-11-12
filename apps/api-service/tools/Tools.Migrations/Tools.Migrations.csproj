@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Aurore.Blueprints.ApiService.Tools.Migrations</AssemblyName>
+    <RootNamespace>Aurore.Blueprints.ApiService.Tools.Migrations</RootNamespace>
+    <DisableImplicitContentFiles>true</DisableImplicitContentFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-rc.3.26522.148" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\foundation\src\EntityFrameworkCore.Postgres\EntityFrameworkCore.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Infra\Infra.csproj" />
+  </ItemGroup>
+
+</Project>

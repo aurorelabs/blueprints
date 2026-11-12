@@ -1,6 +1,6 @@
 <Project>
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
 
         <!-- Language Settings -->
         <ImplicitUsings>disable</ImplicitUsings>
@@ -12,7 +12,8 @@
         <Company>AuroreLabs</Company>
         <Copyright>AuroreLabs</Copyright>
 
-        <!-- Code Style Enforcement -->
+        <!-- The application is deployed, never packed. The documentation file also turns on the unused-using check (IDE0005) in the build. -->
+        <IsPackable>false</IsPackable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
@@ -22,4 +23,8 @@
         <IsTestProject>true</IsTestProject>
         <TestingPlatformCommandLineArguments>--results-directory "$(MSBuildThisFileDirectory)artifacts/test-results"</TestingPlatformCommandLineArguments>
     </PropertyGroup>
+
+    <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.9.0" />
+    </ItemGroup>
 </Project>

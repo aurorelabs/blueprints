@@ -1,5 +1,9 @@
+using System;
+using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Tests.Integration.OpenApi;
@@ -27,6 +31,31 @@ public sealed class OpenApiSecurityTests(WebApplicationFactory<Program> factory)
 
         // Assert
         Assert.Equal(expectedSecured, secured);
+    }
+
+    public static TheoryData<string, string[]> SchemesByEndpoint => new()
+    {
+        { "/v1/demo/auth/either", ["Bearer", "OAuth2", "OIDC", "X-Api-Key"] }, // nothing pinned: every scheme
+        { "/v1/demo/auth/api-key-only", ["X-Api-Key"] }, // pinned to the API key
+        { "/v1/demo/auth/bearer-only", ["Bearer", "OAuth2", "OIDC"] }, // pinned to bearer tokens: the token schemes
+    };
+
+    [Theory(DisplayName = "An operation lists only the security schemes its endpoint accepts")]
+    [MemberData(nameof(SchemesByEndpoint))]
+    public async Task OperationListsOnlyTheSchemesItAccepts(string path, string[] expected)
+    {
+        // Arrange
+        using var document = await GetDocumentAsync("v1");
+
+        // Act
+        var schemes = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty("get").GetProperty("security")
+            .EnumerateArray()
+            .SelectMany(requirement => requirement.EnumerateObject().Select(x => x.Name))
+            .Order()
+            .ToArray();
+
+        // Assert
+        Assert.Equal(expected, schemes);
     }
 
     [Fact(DisplayName = "The document does not apply security to every operation")]
@@ -67,7 +96,7 @@ public sealed class OpenApiSecurityTests(WebApplicationFactory<Program> factory)
 
         // Act
         var parameters = document.RootElement
-            .GetProperty("paths").GetProperty("/v1/customers").GetProperty("get").GetProperty("parameters")
+            .GetProperty("paths").GetProperty("/v1/demo/pagination/people").GetProperty("get").GetProperty("parameters")
             .EnumerateArray()
             .Select(x => (Name: x.GetProperty("name").GetString(), In: x.GetProperty("in").GetString()))
             .ToList();
@@ -84,7 +113,7 @@ public sealed class OpenApiSecurityTests(WebApplicationFactory<Program> factory)
     {
         { "/v1/demo/idempotency/orders", "post", false }, // marked WithIdempotency(): optional
         { "/v1/demo/idempotency/payments", "post", true }, // marked WithIdempotency(required: true)
-        { "/v1/customers", "get", null }, // not idempotent: no header
+        { "/v1/demo/pagination/people", "get", null }, // not idempotent: no header
         { "/v1/demo/results/orders", "post", null }, // a POST without the mark: no header
     };
 

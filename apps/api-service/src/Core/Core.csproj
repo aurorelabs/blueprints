@@ -10,8 +10,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\foundation\Core\Core.csproj" />
-    <ProjectReference Include="..\..\foundation\Telemetry\Telemetry.csproj" />
+    <ProjectReference Include="..\..\..\..\..\foundation\src\Core\Core.csproj" />
+    <ProjectReference Include="..\..\..\..\..\foundation\src\Telemetry\Telemetry.csproj" />
+    <ProjectReference Include="..\..\..\..\..\foundation\src\EntityFrameworkCore.Postgres\EntityFrameworkCore.Postgres.csproj" />
   </ItemGroup>
 
 </Project>
